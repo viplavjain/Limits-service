@@ -1,3 +1,15 @@
+(i) application.yml file
+spring:
+  datasource:
+      driver-class-name: oracle.jdbc.driver.OracleDriver
+      url: jdbc:oracle:thin:@your_oracle_host:1521:your_oracle_sid
+      username: your_oracle_username
+      password: your_oracle_password
+  data:
+    cassandra:
+      keyspace: your_keyspace
+      contact-points: your_cassandra_host
+      port: 9042
 (ii) OracleEntity
 
 @Entity
