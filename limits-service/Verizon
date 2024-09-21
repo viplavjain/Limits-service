@@ -1,3 +1,31 @@
+(ii) OracleEntity
+
+@Entity
+@Data
+public class OracleEntity{
+
+@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+private String name;
+
+} 
+
+@Table
+@Data
+public class CassandraEntity{
+
+@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+private String name;
+
+} 
+
+----------------------------------------------------------------------
+
 (i) GenericRepository interface
 
      public interface GenericRepository<T,ID>{
@@ -19,3 +47,42 @@
    List<T> findAll();
 }
 
+(iv) Cassandra Repository
+
+ @Repository
+ public interface CassandraEntityRepository extends CassandraRepository<CassandraEntity,Long>, 
+ GenericRepository<CassandraEntity,Long> {
+ 
+   List<T> findByDeviceId(ID id);
+   List<T> findAll();
+}
+---------------------------------------------------------
+@Service
+(i) public class GenericService<T,ID> {
+
+private final GenericRepository<T,ID> repository;
+
+@Autowired
+public GenericService(GenericRepository<T,ID> repository){
+this.repository = repository;
+}
+
+public T save(T entity){
+return repository.save(entity);
+}
+
+public Optional<T> findById(ID id){
+return repository.findById(id);
+}
+
+}
+------------------------------------------------------------
+@Service
+public class OracleService extends GenericService<OracleEntity, Long>{
+
+@AUtowired
+public OracleService(OracleEntityRepository repository)
+{
+  super(repository);
+}
+}
