@@ -1,1 +1,21 @@
-Unresolved plugin: 'org.springframework.boot:spring-boot-maven-plugin:3.3.3'
+(i) GenericRepository interface
+
+     public interface GenericRepository<T,ID>{
+      
+     T save(T entity);
+     List<T> findBySkewId(ID id);
+     Optional<T> findById(ID id);
+     Iterable<T> findAll();
+     void delete(T entity);
+     void deleteById(ID id);
+   }
+(iii) Oracle Repository
+ 
+ @Repository
+ public interface OracleEntityRepository extends JpaRepository<OracleEntity,Long>, 
+ GenericRepository<OracleEntity,Long> {
+ 
+   List<T> findByDeviceId(ID id);
+   List<T> findAll();
+}
+
