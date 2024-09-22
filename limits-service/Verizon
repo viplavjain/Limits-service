@@ -1,100 +1,281 @@
-(i) application.yml file
-spring:
-  datasource:
-      driver-class-name: oracle.jdbc.driver.OracleDriver
-      url: jdbc:oracle:thin:@your_oracle_host:1521:your_oracle_sid
-      username: your_oracle_username
-      password: your_oracle_password
-  data:
-    cassandra:
-      keyspace: your_keyspace
-      contact-points: your_cassandra_host
-      port: 9042
-(ii) OracleEntity
+(i) /***EmployeeController**/
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
 
-@Entity
-@Data
-public class OracleEntity{
+import java.util.List;
 
-@Id
-@GeneratedValue(strategy = GenerationType.IDENTITY)
-private Long id;
+@RestController
+public class EmployeeController {
 
-private String name;
+    @Autowired
+    private EmployeeService employeeService;
 
-} 
+    @GetMapping("/employees")
+    public List<Employee> fetchAllEmployees(@RequestParam("system") String system) {
+        DataSourceContextHolder.setSystemKey(system);  // Set the system key to decide which DB to use
+        List<Employee> employees = employeeService.fetchAllEmployees();
+        DataSourceContextHolder.clear();  // Clear the context to prevent leakage
+        return employees;
+    }
 
-@Table
-@Data
-public class CassandraEntity{
+    @PostMapping("/employees")
+    public Employee saveEmployee(@RequestParam("system") String system, @RequestBody Employee employee) {
+        DataSourceContextHolder.setSystemKey(system);
+        Employee savedEmployee = employeeService.saveEmployee(employee);
+        DataSourceContextHolder.clear();
+        return savedEmployee;
+    }
 
-@Id
-@GeneratedValue(strategy = GenerationType.IDENTITY)
-private Long id;
-
-private String name;
-
-} 
-
-----------------------------------------------------------------------
-
-(i) GenericRepository interface
-
-     public interface GenericRepository<T,ID>{
-      
-     T save(T entity);
-     List<T> findBySkewId(ID id);
-     Optional<T> findById(ID id);
-     Iterable<T> findAll();
-     void delete(T entity);
-     void deleteById(ID id);
-   }
-(iii) Oracle Repository
- 
- @Repository
- public interface OracleEntityRepository extends JpaRepository<OracleEntity,Long>, 
- GenericRepository<OracleEntity,Long> {
- 
-   List<T> findByDeviceId(ID id);
-   List<T> findAll();
+    @DeleteMapping("/employees/{id}")
+    public String deleteEmployee(@RequestParam("system") String system, @PathVariable Long id) {
+        DataSourceContextHolder.setSystemKey(system);
+        employeeService.deleteEmployee(id);
+        DataSourceContextHolder.clear();
+        return "Employee deleted successfully.";
+    }
 }
+(ii) /***EmployeeService***/
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.List;
 
-(iv) Cassandra Repository
-
- @Repository
- public interface CassandraEntityRepository extends CassandraRepository<CassandraEntity,Long>, 
- GenericRepository<CassandraEntity,Long> {
- 
-   List<T> findByDeviceId(ID id);
-   List<T> findAll();
-}
----------------------------------------------------------
 @Service
-(i) public class GenericService<T,ID> {
+public class EmployeeService {
 
-private final GenericRepository<T,ID> repository;
+    @Autowired
+    private OracleEmployeeRepository oracleEmployeeRepository;
 
-@Autowired
-public GenericService(GenericRepository<T,ID> repository){
-this.repository = repository;
+    @Autowired
+    private CassandraEmployeeRepository cassandraEmployeeRepository;
+
+    public GenericRepository<Employee, Long> getRepository() {
+        if (DataSourceContextHolder.isCassandraSystem()) {
+            return cassandraEmployeeRepository;
+        } else {
+            return oracleEmployeeRepository;
+        }
+    }
+
+    public List<Employee> fetchAllEmployees() {
+        return getRepository().findAll();
+    }
+
+    public Employee saveEmployee(Employee employee) {
+        return getRepository().save(employee);
+    }
+
+    public void deleteEmployee(Long id) {
+        getRepository().deleteById(id);
+    }
 }
 
-public T save(T entity){
-return repository.save(entity);
+(iii) /**DataSourceContextHolder**/
+public class DataSourceContextHolder {
+
+    private static final ThreadLocal<String> CONTEXT = new ThreadLocal<>();
+
+    public static void setSystemKey(String key) {
+        CONTEXT.set(key);
+    }
+
+    public static String getSystemKey() {
+        return CONTEXT.get();
+    }
+
+    public static void clear() {
+        CONTEXT.remove();
+    }
+
+    public static boolean isCassandraSystem() {
+        String key = CONTEXT.get();
+        return "system3".equals(key);  // Return true if it's the Cassandra system
+    }
 }
 
-public Optional<T> findById(ID id){
-return repository.findById(id);
+(iv) /*** RoutingDataSource***/
+import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
+
+public class RoutingDataSource extends AbstractRoutingDataSource {
+
+    @Override
+    protected Object determineCurrentLookupKey() {
+        return DataSourceContextHolder.getSystemKey();
+    }
 }
 
+(v) /**DataSourceConfig***/
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.jdbc.DataSourceBuilder;
+import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
+import org.springframework.data.cassandra.config.CqlSessionFactoryBean;
+import com.datastax.oss.driver.api.core.CqlSession;
+import javax.sql.DataSource;
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+public class DataSourceConfig {
+
+    @Bean
+    public DataSource system1OracleDataSource() {
+        return DataSourceBuilder.create()
+                .url("jdbc:oracle:thin:@localhost:1521:db1")
+                .username("system1user")
+                .password("password1")
+                .driverClassName("oracle.jdbc.OracleDriver")
+                .build();
+    }
+
+    @Bean
+    public DataSource system2OracleDataSource() {
+        return DataSourceBuilder.create()
+                .url("jdbc:oracle:thin:@localhost:1521:db2")
+                .username("system2user")
+                .password("password2")
+                .driverClassName("oracle.jdbc.OracleDriver")
+                .build();
+    }
+
+    // Cassandra Session for System 3
+    @Bean
+    public CqlSessionFactoryBean cassandraSession() {
+        CqlSessionFactoryBean cassandraSession = new CqlSessionFactoryBean();
+        cassandraSession.setContactPoints("127.0.0.1");  // Replace with actual Cassandra contact point
+        cassandraSession.setKeyspaceName("system3keyspace");
+        cassandraSession.setPort(9042);
+        return cassandraSession;
+    }
+
+    // Oracle Routing Data Source
+    @Bean
+    public DataSource routingOracleDataSource(DataSource system1OracleDataSource, DataSource system2OracleDataSource) {
+        RoutingDataSource routingDataSource = new RoutingDataSource();
+        Map<Object, Object> dataSourceMap = new HashMap<>();
+        
+        dataSourceMap.put("system1", system1OracleDataSource);
+        dataSourceMap.put("system2", system2OracleDataSource);
+        
+        routingDataSource.setTargetDataSources(dataSourceMap);
+        return routingDataSource;
+    }
 }
-------------------------------------------------------------
+
+(vi) RoutingCassandraTemplate
+
+import org.springframework.data.cassandra.core.CassandraTemplate;
+import org.springframework.data.cassandra.core.CqlTemplate;
+import com.datastax.oss.driver.api.core.CqlSession;
+
+public class RoutingCassandraTemplate extends CassandraTemplate {
+
+    public RoutingCassandraTemplate(CqlSession session) {
+        super(session);
+    }
+
+    // You can add additional logic here if needed for Cassandra-specific routing.
+}
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface OracleEmployeeRepository extends JpaRepository<Employee, Long>, GenericRepository<Employee, Long> {
+    // JpaRepository provides findAll, save, deleteById, so no additional methods needed
+}
+
+import org.springframework.data.cassandra.repository.CassandraRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface CassandraEmployeeRepository extends CassandraRepository<Employee, Long>, GenericRepository<Employee, Long> {
+    // CassandraRepository provides findAll, save, deleteById, so no additional methods needed
+}
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.List;
+
 @Service
-public class OracleService extends GenericService<OracleEntity, Long>{
+public class EmployeeService {
 
-@AUtowired
-public OracleService(OracleEntityRepository repository)
-{
-  super(repository);
+    @Autowired
+    private OracleEmployeeRepository oracleEmployeeRepository;
+
+    @Autowired
+    private CassandraEmployeeRepository cassandraEmployeeRepository;
+
+    public GenericRepository<Employee, Long> getRepository() {
+        if (DataSourceContextHolder.isCassandraSystem()) {
+            return cassandraEmployeeRepository;
+        } else {
+            return oracleEmployeeRepository;
+        }
+    }
+
+    public List<Employee> fetchAllEmployees() {
+        return getRepository().findAll();
+    }
+
+    public Employee saveEmployee(Employee employee) {
+        return getRepository().save(employee);
+    }
+
+    public void deleteEmployee(Long id) {
+        getRepository().deleteById(id);
+    }
 }
+
+(viii) Employee
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import org.springframework.data.cassandra.core.mapping.PrimaryKey;
+import org.springframework.data.cassandra.core.mapping.Table as CassandraTable;
+
+@Entity  // For JPA (Oracle)
+@Table(name = "EMPLOYEE")  // Oracle table name
+@CassandraTable("employee")  // Cassandra table name
+public class Employee {
+
+    @Id  // JPA (Oracle)
+    @PrimaryKey  // Cassandra
+    private Long id;
+
+    private String name;
+
+    private double salary;
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public double getSalary() {
+        return salary;
+    }
+
+    public void setSalary(double salary) {
+        this.salary = salary;
+    }
 }
+
+
+
+
+
+
+
+
