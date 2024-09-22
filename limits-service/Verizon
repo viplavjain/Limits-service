@@ -272,6 +272,16 @@ public class Employee {
     }
 }
 
+(ix) GenericRepository
+import java.util.List;
+
+public interface GenericRepository<T, ID> {
+    List<T> findAll();
+    T save(T entity);
+    void deleteById(ID id);
+}
+
+
 
 
 
