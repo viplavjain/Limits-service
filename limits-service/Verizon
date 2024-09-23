@@ -147,6 +147,36 @@ public class DataSourceConfig {
         return cassandraSession;
     }
 
+@Configuration
+public class DatabaseConfig {
+
+    @Value("${spring.datasource.system1.url}")
+    private String system1Url;
+
+    @Value("${spring.datasource.system1.username}")
+    private String system1Username;
+
+    @Value("${spring.datasource.system1.password}")
+    private String system1Password;
+
+    @Value("${spring.datasource.system1.driver-class-name}")
+    private String system1DriverClassName;
+
+    // ... similar properties for system2
+
+    @Bean
+    public DataSource system1OracleDataSource() {
+        return DataSourceBuilder.create()
+                .url(system1Url)
+                .username(system1Username)
+                .password(system1Password)
+                .driverClassName(system1DriverClassName)
+                .build();
+    }
+
+    // ... similar method for system2
+}
+
     // Oracle Routing Data Source
     @Bean
     public DataSource routingOracleDataSource(DataSource system1OracleDataSource, DataSource system2OracleDataSource) {
