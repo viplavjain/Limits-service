@@ -475,3 +475,40 @@ Opens a new file for writing (l_file_name1).
 Iterates through the l_data_list1 collection and writes each row to the file.
 Closes the file when done.
 --------------------------------------------------------------------------------------------------------------------
+
+*/query 1 creation/*
+l_cnt holds the number of rows fetched by the cursor cat_class_cd_cap_list in an earlier part of the procedure.
+This check ensures that file creation only occurs if there are rows to process (i.e., if l_cnt > 0).
+
+utl_file.fopen opens a file for writing.
+l_dir_path: The directory where the file will be created. This is set earlier in the procedure to 'CPI_EFS_ORA_OUTPUT_APMS191P'.
+l_file_name1: The name of the file, which includes the current date (l_curr_date) and is generated as 'SPO_CATEGORY_CLASS_CODE_FEED_' || l_curr_date || '.TXT'.
+'W': This mode opens the file for writing (if the file already exists, it is overwritten).
+
+l_data_list1 is a collection (PL/SQL table) that holds the data fetched by the cat_class_cd_cap_list cursor. Each iteration processes one row from this collection.
+The loop goes through each record from l_data_list1.first to l_data_list1.last, where:
+l_data_list1(i) refers to the ith row in the collection.
+UTL_FILE.PUT_LINE writes a line to the file.
+The line is constructed by concatenating:
+PRC_CAT_CLASS_CD: A category or class code (trimmed of leading/trailing spaces).
+A pipe (|) separator.
+PRC_CAT_CLASS_DSC: A description for the category or class (trimmed).
+Another pipe (|) separator.
+OFFR_CNT: A numeric field representing the offer count (trimmed).
+Another pipe (|) separator and an empty string (could be a placeholder for future data).
+
+The result is a pipe-separated value (PSV) format:
+
+This marks the end of the loop over l_data_list1. The procedure will continue writing rows to the file until all records have been processed.
+
+----------------------------------------------------------------------------------------
+Log file generation status
+--job log status 
+XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id, v_jobid, $$plsql_Unit,
+                                              $$plsql_Unit,
+                                              $$plsql_Unit || ' Query  File Generated',
+                                              $$plsql_line,
+                                              null,
+                                              SYS_CONTEXT('USERENV','SESSION_USER'));
+This call logs a message that the query file has been generated successfully. It invokes a logging procedure XX_PR_JOB_RUN_STATUS in the XXVZN_JOB_STATUS_LOG_PKG package.
+The message includes information like the correlation ID (p_cor_rel_id), job ID (v_jobid), and the file generation status (Query File Generated).
