@@ -374,3 +374,104 @@ Step 6: Open cursors to fetch data and write it to files.
 For cat_class_cd_cap_list: Write the data to SPO_CATEGORY_CLASS_CODE_FEED.
 For cat_class_cd_cap_delta_list: Write the data to SPO_CATEGORY_CLASS_CODE_FEED_DELTA.
 Step 7: Log completion or failure.
+
+Line by line understanding
+fp: A file handle for file operations (UTL_FILE package).
+l_dir_path: Directory path where the output files will be stored.
+l_curr_date and l_prev_date: Store the current and previous day’s dates in the format YYYYMMDD.
+l_prev_file_name1 and l_prev_file_name2: The names of the files created during the previous day’s job run, which will be deleted before new files are generated.
+
+l_file_name1 and l_file_name2: Filenames for the files to be generated during this run.
+
+l_success_flag and l_failure_flag: Flags used to track job success or failure.
+l_collect_limit1 and l_collect_limit2: Limits for bulk data collection (batch size).
+
+cat_class_cd_cap_list: Cursor to fetch data from APMS191P_OUTPUT.
+cat_class_cd_cap_delta_list: Cursor to fetch data from PRC_CAT_CLASS_CD_CAP_DELTA_V.
+
+Declares a PL/SQL collection (array-like data structure) l_data_list1 to store rows fetched from cat_class_cd_cap_list.
+Declares another collection l_data_list2 to store rows fetched from cat_class_cd_cap_delta_list.
+
+----------------------------------------------------------------------------------------------------------------------
+/*Insert Initial Job Status*/
+INSERT INTO BATCH_USER.PMS_JOB_STATUS (correlation_id, s_id, task_name, status, start_date, end_date, created_by) 
+VALUES (p_cor_rel_id, p_seq_no, 'APMS191P', 'CREATED', sysdate, null, 'BATCH');
+COMMIT;
+Inserts a new record into the PMS_JOB_STATUS table to log the initial job status.
+Fields like status, start_date, and created_by are populated, and the transaction is committed.
+----------------------------------------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------------------------
+/*Determine if Data Processing is Necessary*/
+BEGIN
+    SELECT trunc(CREATION_DATE) INTO l_db_date FROM BATCH_USER.APMS191P_OUTPUT WHERE ROWNUM <= 1;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        l_db_date := trunc(sysdate);
+END;
+This block tries to fetch the creation date of the first record in APMS191P_OUTPUT.
+If no data is found (NO_DATA_FOUND), today's date is assigned to l_db_date.
+----------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------------------------------
+/*Data Processing Based on Date*/
+IF l_db_date = trunc(sysdate) THEN
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE BATCH_USER.APMS191P_OUTPUT';
+    INSERT INTO BATCH_USER.APMS191P_OUTPUT(PRC_CAT_CLASS_CD, PRC_CAT_CLASS_DSC, OFFR_CNT)
+    SELECT PRC_CAT_CLASS_CD, PRC_CAT_CLASS_DSC, OFFR_CNT FROM PRC_CAT_CLASS_CD_CAP_V;
+    COMMIT;
+END IF;
+If the data in APMS191P_OUTPUT is for today (l_db_date = trunc(sysdate)):
+Truncate the table to remove old data.
+Insert the latest records from PRC_CAT_CLASS_CD_CAP_V.
+-------------------------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------------------------
+/*Data Processing Based on Date*/
+IF l_db_date < trunc(sysdate) THEN
+    INSERT INTO BATCH_USER.APMS191P_OUTPUT_HIST(...);
+    COMMIT;
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE BATCH_USER.APMS191P_OUTPUT_PREV';
+    INSERT INTO BATCH_USER.APMS191P_OUTPUT_PREV(...);
+    COMMIT;
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE BATCH_USER.APMS191P_OUTPUT';
+    INSERT INTO BATCH_USER.APMS191P_OUTPUT(...);
+    COMMIT;
+END IF;
+If the data is older than today (l_db_date < trunc(sysdate)):
+Move old data to APMS191P_OUTPUT_HIST.
+Load the current data into APMS191P_OUTPUT_PREV.
+Truncate both OUTPUT_PREV and OUTPUT, and reload the latest data
+--------------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+/*File deletion*/
+SELECT dbms_lob.fileexists(bfilename(l_dir_path, l_prev_file_name1)) INTO l_exist FROM dual;
+IF l_exist = 1 THEN
+    utl_file.fremove(l_dir_path, l_prev_file_name1);
+END IF;
+Checks if the previous day's file (l_prev_file_name1) exists and deletes it using UTL_FILE.FREMOVE.
+----------------------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------------
+/*Data fetching and writing to files*/
+OPEN cat_class_cd_cap_list;
+LOOP
+    FETCH cat_class_cd_cap_list BULK COLLECT INTO l_data_list1;
+    l_cnt := cat_class_cd_cap_list%rowcount;
+    exit when cat_class_cd_cap_list%notfound;
+END LOOP;
+CLOSE cat_class_cd_cap_list;
+Opens the cat_class_cd_cap_list cursor, fetches the data in bulk, and stores it in the collection l_data_list1.
+----------------------------------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------------------------------------
+fp := utl_file.fopen(l_dir_path, l_file_name1, 'W');
+FOR i IN l_data_list1.first..l_data_list1.last LOOP
+    UTL_FILE.PUT_LINE(fp, ''|| trim(l_data_list1(i).PRC_CAT_CLASS_CD) || '|' || ... );
+END LOOP;
+utl_file.fclose(fp);
+Opens a new file for writing (l_file_name1).
+Iterates through the l_data_list1 collection and writes each row to the file.
+Closes the file when done.
+--------------------------------------------------------------------------------------------------------------------
