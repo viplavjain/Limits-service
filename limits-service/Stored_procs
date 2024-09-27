@@ -1,1 +1,328 @@
+create or replace PROCEDURE            "APMS191P_PROCESS" (
+    p_cor_rel_id IN varchar2,
+    v_jobid  OUT NUMBER,
+    v_status OUT VARCHAR2,
+    p_seq_no NUMBER
+) AS
+/*=============================================================================================+
+  |                               Copyright (c) 2024 Verizon                                     |
+  |                                 All rights reserved.                                         |
+  +==============================================================================================+
+  |
+  | Header            : $1.0
+  | File              : APMS191P
+  | Procedure Name    : APMS191P
+  | Developed By      : Hareesh Balakrishnan
+  | Description       : Procedure for APMS191P JOB
+  |
+  |  ***************************************** IMPORTANT! *****************************************
+  |   If you need to change this file please ensure you :
+  |           a) Increment the version number and update the change history.
+  |           b) Comment the code with the version number and initials.
+  |           c) Update the technical design document.
+  |  **********************************************************************************************
+  |
+  |  Change History :
+  |
+  |  Who                    When            Version    Change (include Bug#if appropriate)
+  |+----------------------+---------------+----------+--------------------------------------------+
+  | Hareesh Balakrishnan  | 12-MAR-2024   | 1.0      | Initial Revision
+  |+----------------------+---------------+----------+---------------------------------------------
+  +==============================================================================================*/
 
+    --variable declaration
+
+    fp                 utl_file.file_type;
+    l_dir_path         VARCHAR2(100)  := 'CPI_EFS_ORA_OUTPUT_APMS191P';
+    l_curr_date        VARCHAR2(100)  :=to_char(sysdate, 'YYYYMMDD'); -- to_char(sysdate, 'DD-MON-YYYY');
+    l_prev_date        VARCHAR2(100)  :=to_char(sysdate-1, 'YYYYMMDD');-- to_char(sysdate-1, 'DD-MON-YYYY');
+    l_prev_file_name1  VARCHAR2(1000) := 'DD191AT_CLASSCD_TEMP'||'_'||l_curr_date||'.TXT';
+    l_prev_file_name2  VARCHAR2(1000) := 'DD191AT_CLASSCD_DELTA_FINAL'||'_'||l_curr_date||'.TXT';
+
+    l_file_name1       VARCHAR2(1000) := 'SPO_CATEGORY_CLASS_CODE_FEED'||'_'||l_curr_date||'.TXT';
+    l_file_name2       VARCHAR2(1000) := 'SPO_CATEGORY_CLASS_CODE_FEED_DELTA'||'_'||l_curr_date||'.TXT';
+    l_success_flag     VARCHAR2(10)   := 'SUCCESS';
+    l_failure_flag     VARCHAR2(10)   := 'FAILURE';
+    l_collect_limit1   NUMBER         := 10000;
+    l_collect_limit2   NUMBER         := 1000;
+    l_date             DATE           := sysdate;
+    l_exist            NUMBER         := 0;
+    l_cnt              NUMBER         := 0;
+    l_cnt2              NUMBER         := 0;
+    l_db_date DATE;
+    my_errm VARCHAR2(32000);
+    my_code number;
+    -- Query to fetch the first data set
+    CURSOR  cat_class_cd_cap_list IS
+            SELECT * FROM BATCH_USER.APMS191P_OUTPUT; --PRC_CAT_CLASS_CD_CAP_V ;
+
+    CURSOR  cat_class_cd_cap_delta_list IS
+            SELECT * FROM PRC_CAT_CLASS_CD_CAP_DELTA_V;             
+
+
+   TYPE cat_class_cd_cap_list_type IS
+        TABLE OF cat_class_cd_cap_list%rowtype INDEX BY PLS_INTEGER;
+    l_data_list1 cat_class_cd_cap_list_type;
+
+   TYPE cat_class_cd_cap_delta_list_type IS
+        TABLE OF cat_class_cd_cap_delta_list%rowtype INDEX BY PLS_INTEGER;
+    l_data_list2 cat_class_cd_cap_delta_list_type;    
+
+BEGIN
+      --job log status 
+
+       XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id,
+                                                     v_jobid,
+                                                     $$plsql_Unit,
+                                                     $$plsql_Unit,
+                                                     $$plsql_Unit||' Job Initiated',
+                                                     $$plsql_line,
+                                                     v_jobid ,
+                                                     SYS_CONTEXT('USERENV','SESSION_USER'));                                          
+
+    --job log status                                         
+    INSERT INTO BATCH_USER.PMS_JOB_STATUS (correlation_id,s_id,task_name,
+                                status,
+                                start_date,
+                                end_date,
+                                created_by) 
+    VALUES (p_cor_rel_id,p_seq_no,'APMS191P','CREATED',sysdate,null,'BATCH');
+    COMMIT;
+
+
+
+------- DATA HIST PROCESS STARTS----------------
+
+    BEGIN
+        SELECT trunc(CREATION_DATE)
+        INTO l_db_date
+        FROM BATCH_USER.APMS191P_OUTPUT
+        WHERE ROWNUM <= 1;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            l_db_date:=trunc(sysdate);
+    END;
+
+    IF l_db_date = trunc(sysdate) THEN
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE BATCH_USER.APMS191P_OUTPUT';
+    --INSERTING LATEST RECORD IN APMS191P_OUTPUT TABLE
+    INSERT INTO BATCH_USER.APMS191P_OUTPUT(PRC_CAT_CLASS_CD ,PRC_CAT_CLASS_DSC,OFFR_CNT)
+    SELECT PRC_CAT_CLASS_CD ,PRC_CAT_CLASS_DSC,OFFR_CNT FROM PRC_CAT_CLASS_CD_CAP_V;
+    COMMIT;
+    END IF;
+
+    IF l_db_date < trunc(sysdate) THEN
+
+        -- LOAD THE PREV DATA INTO HISTORY TABLE
+        INSERT INTO BATCH_USER.APMS191P_OUTPUT_HIST(PRC_CAT_CLASS_CD ,PRC_CAT_CLASS_DSC,OFFR_CNT,CREATION_DATE)
+        SELECT PRC_CAT_CLASS_CD ,PRC_CAT_CLASS_DSC,OFFR_CNT,CREATION_DATE FROM BATCH_USER.APMS191P_OUTPUT_PREV ;
+        COMMIT;
+        -- TRUNCATE THE PREV DAY DATA FROM THE TABLE  
+        EXECUTE IMMEDIATE 'TRUNCATE TABLE BATCH_USER.APMS191P_OUTPUT_PREV';
+
+        -- LOAD THE CURRENT DATA INTO PREV TABLE
+        INSERT INTO BATCH_USER.APMS191P_OUTPUT_PREV(PRC_CAT_CLASS_CD ,PRC_CAT_CLASS_DSC,OFFR_CNT,CREATION_DATE)
+        SELECT PRC_CAT_CLASS_CD ,PRC_CAT_CLASS_DSC,OFFR_CNT,CREATION_DATE FROM BATCH_USER.APMS191P_OUTPUT ;
+        COMMIT;     
+        -- TRUNCATE THE CURRENT DATE DATA FROM THE TABLE
+        EXECUTE IMMEDIATE 'TRUNCATE TABLE BATCH_USER.APMS191P_OUTPUT';
+
+        --INSERTING LATEST RECORD IN APMS191P_OUTPUT TABLE
+        INSERT INTO BATCH_USER.APMS191P_OUTPUT(PRC_CAT_CLASS_CD ,PRC_CAT_CLASS_DSC,OFFR_CNT)
+        SELECT PRC_CAT_CLASS_CD ,PRC_CAT_CLASS_DSC,OFFR_CNT FROM PRC_CAT_CLASS_CD_CAP_V;
+        COMMIT;
+
+    END IF;
+
+------- DATA HIST PROCESS END----------------
+
+     --Delete file created in the previous day Job run, before creating the file for current day 
+    SELECT dbms_lob.fileexists(bfilename(l_dir_path, l_prev_file_name1))
+      INTO l_exist
+      FROM dual;
+    IF l_exist = 1 THEN
+        utl_file.fremove(l_dir_path, l_prev_file_name1);
+    END IF;
+
+    SELECT dbms_lob.fileexists(bfilename(l_dir_path, l_prev_file_name2))
+      INTO l_exist
+      FROM dual;
+    IF l_exist = 1 THEN
+        utl_file.fremove(l_dir_path, l_prev_file_name2);
+    END IF; -- l_exist = 1
+
+    --query1 data copy to local variable
+    OPEN cat_class_cd_cap_list;
+    LOOP
+        FETCH cat_class_cd_cap_list
+        BULK COLLECT INTO l_data_list1;
+        l_cnt := cat_class_cd_cap_list%rowcount;
+        exit when cat_class_cd_cap_list%notfound;
+    END LOOP;    
+    CLOSE cat_class_cd_cap_list;
+
+    --query2 data copy to local variable
+    OPEN cat_class_cd_cap_delta_list;
+    LOOP
+        FETCH cat_class_cd_cap_delta_list
+        BULK COLLECT INTO l_data_list2;
+        l_cnt2 := nvl(cat_class_cd_cap_delta_list%rowcount,0);
+        exit when cat_class_cd_cap_delta_list%notfound;
+    END LOOP;    
+    CLOSE cat_class_cd_cap_delta_list;    
+
+    --job log status 
+    XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id,
+                                                  p_seq_no,
+                                                  $$plsql_Unit,
+                                                  $$plsql_Unit,
+                                                  $$plsql_Unit||'Query In-Progress',
+                                                  $$plsql_line,
+                                                  null,
+                                                  SYS_CONTEXT('USERENV','SESSION_USER')
+                                                 );
+
+
+    --query1 file creation
+    IF l_cnt >0 THEN
+        fp := utl_file.fopen(l_dir_path, l_file_name1, 'W');
+        FOR i IN l_data_list1.first..l_data_list1.last LOOP
+
+            UTL_FILE.PUT_LINE(fp, ''|| trim(l_data_list1(i).PRC_CAT_CLASS_CD)
+                                    || '|'
+                                    || trim(l_data_list1(i).PRC_CAT_CLASS_DSC)
+                                    || '|'
+                                    || trim(l_data_list1(i).OFFR_CNT)
+                                    || '|'
+                                    || ''
+                             );
+        END LOOP; -- FOR i IN l_data_list1
+
+        --job log status 
+        XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id, v_jobid, $$plsql_Unit,
+                                                 $$plsql_Unit,
+                                                 $$plsql_Unit||' Query  File Generated',
+                                                 $$plsql_line,
+                                                 null,
+                                                 SYS_CONTEXT('USERENV','SESSION_USER'));
+
+        utl_file.fclose(fp);
+         --job log status 
+        XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id,v_jobid,
+                                             $$plsql_Unit,
+                                             $$plsql_Unit,
+                                             $$plsql_Unit||' Query  Completed',
+                                             $$plsql_line,
+                                             null,
+                                             SYS_CONTEXT('USERENV','SESSION_USER'));
+        else
+        XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id,v_jobid,
+                                             $$plsql_Unit,
+                                             $$plsql_Unit,
+                                             $$plsql_Unit||' Query  No records found',
+                                             $$plsql_line,
+                                             null,
+                                             SYS_CONTEXT('USERENV','SESSION_USER'));
+
+        v_status := l_success_flag;
+    END IF;      -- IF l_cnt >0                                 
+
+   --query2 file creation
+    IF l_cnt2 >0 THEN
+        fp := utl_file.fopen(l_dir_path, l_file_name2, 'W');
+        FOR i IN l_data_list2.first..l_data_list2.last LOOP
+
+            UTL_FILE.PUT_LINE(fp, ''|| trim(l_data_list2(i).PRC_CAT_CLASS_CD)
+                                    || '|'
+                                    || trim(l_data_list2(i).PRC_CAT_CLASS_DSC)
+                                    || '|'
+                                    || trim(to_char(l_data_list2(i).OFFR_CNT))
+                                    || '|'
+                                    || ''                                    
+                             );
+        END LOOP; -- FOR i IN l_data_list1
+
+        --job log status 
+        XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id, v_jobid, $$plsql_Unit,
+                                                 $$plsql_Unit,
+                                                 $$plsql_Unit||' Query  File Generated',
+                                                 $$plsql_line,
+                                                 null,
+                                                 SYS_CONTEXT('USERENV','SESSION_USER'));
+
+        utl_file.fclose(fp);
+         --job log status 
+        XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id,v_jobid,
+                                             $$plsql_Unit,
+                                             $$plsql_Unit,
+                                             $$plsql_Unit||' Query  Completed',
+                                             $$plsql_line,
+                                             null,
+                                             SYS_CONTEXT('USERENV','SESSION_USER'));
+        else
+--            XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id,v_jobid,
+--                                                 $$plsql_Unit,
+--                                                 $$plsql_Unit,
+--                                                 $$plsql_Unit||' Query  No records found',
+--                                                 $$plsql_line,
+--                                                 null,
+--                                                 SYS_CONTEXT('USERENV','SESSION_USER'));
+
+        fp := utl_file.fopen(l_dir_path, l_file_name2, 'W');
+--        UTL_FILE.PUT_LINE(fp, ''|| trim(l_data_list2(i).PRC_CAT_CLASS_CD)
+--                                    || '|'
+--                                    || trim(l_data_list2(i).PRC_CAT_CLASS_DSC)
+--                                    || '|'
+--                                    || trim(to_char(l_data_list2(i).OFFR_CNT))
+--                             );
+
+        v_status := l_success_flag;
+    END IF;      -- IF l_cnt2 >0       
+
+    --job log status 
+    XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id, v_jobid,
+                                             null,
+                                             $$plsql_Unit,
+                                             $$plsql_Unit||' Job completed',
+                                             $$plsql_line,
+                                             null,
+                                             SYS_CONTEXT('USERENV','SESSION_USER'));
+   UPDATE BATCH_USER.PMS_JOB_STATUS 
+      SET STATUS   = 'FINISHED',
+          END_DATE = sysdate
+    WHERE S_ID  = p_seq_no;
+    COMMIT;
+
+EXCEPTION
+    WHEN no_data_found then
+         utl_file.fclose(fp);
+       raise_application_error(-20001, 'No records found');
+
+    WHEN utl_file.invalid_path then
+       raise_application_error(-20002, 'the file location or the filename is invalid');
+
+    WHEN utl_file.invalid_operation THEN
+       raise_application_error(-20003, 'The file could not be opened or operated'); 
+    WHEN utl_file.write_error THEN
+       raise_application_error(-20004, 'error occurred during the write operation');    
+    WHEN OTHERS THEN
+        v_status := l_failure_flag;
+         my_code := SQLCODE;
+         my_errm := SQLERRM;
+         dbms_output.put_line('Error code ' || my_code || ': ' || my_errm ||'~~~'||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+
+        --job log status 
+    XXVZN_JOB_STATUS_LOG_PKG.XX_PR_JOB_RUN_STATUS(p_cor_rel_id, v_jobid,
+                                             null,
+                                             $$plsql_Unit,
+                                             $$plsql_Unit||'Job Failed',
+                                             $$plsql_line,
+                                             null,
+                                             SYS_CONTEXT('USERENV','SESSION_USER'));
+
+      UPDATE BATCH_USER.PMS_JOB_STATUS 
+      SET STATUS   = 'FAILED',
+          END_DATE = L_DATE
+    WHERE S_ID  = p_seq_no;                                        
+
+END APMS191P_PROCESS;
