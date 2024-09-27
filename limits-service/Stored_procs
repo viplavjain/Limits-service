@@ -330,3 +330,47 @@ END APMS191P_PROCESS;
 --------------------------------------------------------------------------
 This stored procedure is designed for data processing and file generation.  It seems to extract data from a database, 
 perform some data manipulation, and then writes the results to text files.
+
+Main Components
+Parameters:
+
+p_cor_rel_id: Correlation ID for job tracking.
+v_jobid: Job ID for status logging.
+v_status: Output status to indicate success or failure.
+p_seq_no: Sequence number used in logging.
+File Operations:
+
+Directory and Filenames:
+The procedure interacts with the CPI_EFS_ORA_OUTPUT_APMS191P directory.
+Deletes files from the previous day (DD191AT_CLASSCD_TEMP, DD191AT_CLASSCD_DELTA_FINAL).
+Writes new files (SPO_CATEGORY_CLASS_CODE_FEED, SPO_CATEGORY_CLASS_CODE_FEED_DELTA) based on current data.
+Data Processing:
+
+The procedure performs history processing, moving data between different tables.
+It bulk collects data from two cursors (cat_class_cd_cap_list, cat_class_cd_cap_delta_list).
+It writes this data to text files using the UTL_FILE package.
+Exception Handling:
+
+Various errors like no_data_found, utl_file.invalid_path, and utl_file.write_error are handled gracefully, and relevant logs are updated.
+High-Level Code Flow
+Step 1: Log job start.
+
+Step 2: Fetch the creation date from the APMS191P_OUTPUT table.
+
+Step 3: If today's date matches the fetched date:
+
+Truncate the APMS191P_OUTPUT table.
+Insert the latest data from PRC_CAT_CLASS_CD_CAP_V.
+Step 4: If the date is from a previous day:
+
+Archive old data in the APMS191P_OUTPUT_HIST table.
+Clear out the APMS191P_OUTPUT_PREV and APMS191P_OUTPUT tables.
+Load the previous day’s data into the APMS191P_OUTPUT_PREV.
+Insert the latest data into APMS191P_OUTPUT.
+Step 5: Delete previous files.
+
+Step 6: Open cursors to fetch data and write it to files.
+
+For cat_class_cd_cap_list: Write the data to SPO_CATEGORY_CLASS_CODE_FEED.
+For cat_class_cd_cap_delta_list: Write the data to SPO_CATEGORY_CLASS_CODE_FEED_DELTA.
+Step 7: Log completion or failure.
