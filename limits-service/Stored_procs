@@ -326,3 +326,7 @@ EXCEPTION
     WHERE S_ID  = p_seq_no;                                        
 
 END APMS191P_PROCESS;
+
+--------------------------------------------------------------------------
+This stored procedure is designed for data processing and file generation.  It seems to extract data from a database, 
+perform some data manipulation, and then writes the results to text files.
