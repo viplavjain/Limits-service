@@ -604,3 +604,51 @@ public class JTXPartitionDriverImplGen extends JTXPartitionDriverImplFixed
         clearNullColSet();
     }
 }
+----------------------------------------------------
+private static String processingpromoRefFeed(Map<String, String> map, String feedName, String assetType) throws Exception {
+
+		try {
+			if (map.get("sor_promo_end_date") != null) {
+				map.put("sor_promo_end_date", getUTCToLocalDate(map.get("sor_promo_end_date")));
+			}
+			if (map.get("sor_promo_effec_date") != null) {
+				map.put("sor_promo_effec_date", getUTCToLocalDate(map.get("sor_promo_effec_date")));
+			}
+			
+			if(map.get("sor_promo_scrn_cde") != null) {
+				map.put("sor_promo_scrn_cde", map.get("sor_promo_scrn_cde").trim());
+			}
+			
+
+			SearchRequestAdapter searchRequestAdapter = new SearchRequestAdapter();
+			VisionFeedTemplateProcessing visionFeedTemplateProcessing = new VisionFeedTemplateProcessing();
+			ArrayList<String> sorPromoList = new ArrayList<String>();
+			sorPromoList.add(map.get("sor_promo_id"));
+			ArrayList<String> catalogOneIdVisionPromoRefList = (ArrayList<String>) searchRequestAdapter.getCOneID(
+					sorPromoList, "genericelemententry", "visionPromoRef.sorPromoId", true,
+					InputReader.getConfiguationPropertyValue("visionPromoRefSchemaId"));
+
+			if (null != catalogOneIdVisionPromoRefList && catalogOneIdVisionPromoRefList.size() > 0) {
+				
+				if(map.containsKey("promo_display_name")) {
+					map.remove("promo_display_name"); 
+				}
+				
+				DomainApiAdapter domainApiAdapter = new DomainApiAdapter();
+				JsonNode geeTemplate = domainApiAdapter.getGEETemplate(catalogOneIdVisionPromoRefList.get(0));
+				visionFeedTemplateProcessing.createGeeFromDomainTemplate(geeTemplate, map, feedName, assetType,
+						catalogOneIdVisionPromoRefList.get(0));
+				generateFile(map.get("sor_promo_id"), "update", folderPath, "PROMO_VISION_FEED.txt", assetType);
+				return "success";
+
+			} else {
+				visionFeedTemplateProcessing.createGeeFromExistingTemplate(map, feedName, assetType);
+				generateFile(map.get("sor_promo_id"), "create", folderPath, "PROMO_VISION_FEED.txt", assetType);
+				return "success";
+			}
+		} catch (Exception e) {
+			VisionFeedLoader.generateFile(map.get("sor_promo_id"), InboundConstants.FALIURE, folderPath,"PROMO_VISION_FEED.txt", assetType);
+			log.error("Method: processingpromoRefFeed :::  Exception::: {}", e.getMessage());
+			//emailService.sendParserExceptionMail("During Vision Promo Ref Data Processing::"+e.toString(), e.getClass().getName());
+			throw e;
+		}
