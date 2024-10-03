@@ -652,3 +652,10 @@ private static String processingpromoRefFeed(Map<String, String> map, String fee
 			//emailService.sendParserExceptionMail("During Vision Promo Ref Data Processing::"+e.toString(), e.getClass().getName());
 			throw e;
 		}
+
+------------------------------------------------------------------------------------------------------
+WORK_FLOW_ID	NUMBER(38,0)	No		1	
+PROCEDURE	VARCHAR2(100 BYTE)	No		2	
+SEQ_ID	NUMBER(38,0)	No		3	
+OUTPUT	CLOB	Yes		4	
+EXTRACT_DTM	TIMESTAMP(6)
