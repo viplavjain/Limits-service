@@ -659,3 +659,14 @@ PROCEDURE	VARCHAR2(100 BYTE)	No		2
 SEQ_ID	NUMBER(38,0)	No		3	
 OUTPUT	CLOB	Yes		4	
 EXTRACT_DTM	TIMESTAMP(6)
+
+public class WorkFlow {
+    private long workFlowId;
+    private String procedure;
+    private long seqId;
+    private String output;
+    private Timestamp extractDtm;
+
+    // Getters and Setters
+    // ...
+}
