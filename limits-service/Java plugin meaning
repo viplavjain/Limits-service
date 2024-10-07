@@ -1,0 +1,56 @@
+This code snippet processes promotional reference data for a vision system. It takes a map containing key-value pairs representing the data, along with the feed name and asset type, and performs different actions based on the presence of a specific key in the map.
+
+Here's a breakdown of the code:
+
+Function: processingpromoRefFeed
+
+Date conversion: It checks for keys sor_promo_end_date and sor_promo_effec_date in the map. If present, it converts their values from UTC to local date format using a function getUTCToLocalDate (not shown).
+
+Trim value: It trims any leading/trailing spaces from the value associated with the key sor_promo_scrn_cde in the map (if present).
+
+Searching for COneID:
+
+It creates instances of helper classes SearchRequestAdapter and VisionFeedTemplateProcessing.
+It retrieves the sor_promo_id from the map and creates a list containing only this ID.
+It calls the getCOneID function (explained later) to search for a document with this ID in the COne system using a specific context type, search field, and schema ID.
+Processing based on COneID existence:
+
+If a document is found in COne (meaning catalogOneIdVisionPromoRefList is not null and has elements):
+
+It removes the key promo_display_name from the map (if present).
+It retrieves the complete template from the COne system using the getGEETemplate function (explained later) with the COne ID found earlier.
+It calls the createGeeFromDomainTemplate function (explained later) to populate the template with data from the map and other parameters.
+It generates a success file using the generateFile function (explained later) with the ID, status ("update"), folder path, file name ("PROMO_VISION_FEED.txt"), and asset type.
+If no document is found in COne:
+
+It calls the createGeeFromExistingTemplate function (not shown) to create a new template based on existing configurations.
+It generates a success file using the generateFile function with the ID, status ("create"), folder path, file name ("PROMO_VISION_FEED.txt"), and asset type.
+Error handling:
+
+If any exception occurs during processing, it logs the error message and throws the exception. It also calls functions for error notification (not shown).
+Function: getCOneID
+
+This function retrieves the COne ID for a given list of IDs (typically SKU IDs) based on a specific context type, search field, schema ID, and whether it's a linked asset.
+It uses the SearchApiAdapter class to interact with the COne search API.
+It builds the search request based on the provided parameters and calls the search API.
+It parses the search response to extract COne document IDs and returns them as a list.
+Function: getGEETemplate
+
+This function retrieves a complete Generic Element Entry (GEE) template from the Amdocs Domain API using a COne ID.
+It uses the com.vzw.epc.mapper.amdocs.domainApi.generic.ApiClient class to interact with the Domain API.
+It builds the API request with authorization headers and base URL based on configuration properties.
+It retrieves the GEE data for the provided COne ID and returns it as a JsonNode object.
+Function: createGeeFromDomainTemplate
+
+This function takes a GEE template (JsonNode), a map containing data, feed name, asset name, and COne ID as input.
+It retrieves configuration properties for the asset name to determine how to map data from the input map to the template fields.
+It iterates through the map entries and updates the corresponding fields in the template based on the mapping configuration.
+It handles linked assets (assets that reference other assets) by searching for COne IDs of the linked asset values and updating the template accordingly.
+Finally, it creates a file containing the populated GEE template in JSON format.
+Function: generateFile
+
+This function generates a file with specific information about the processed data.
+It takes the ID, status ("create" or "update"), folder path, file name, and asset type as input.
+It creates a file in the specified folder path with the provided file name.
+It writes the ID, status, and asset type separated by pipes ("|") to the file in append mode.
+It then
