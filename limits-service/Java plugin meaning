@@ -54,3 +54,7 @@ It takes the ID, status ("create" or "update"), folder path, file name, and asse
 It creates a file in the specified folder path with the provided file name.
 It writes the ID, status, and asset type separated by pipes ("|") to the file in append mode.
 It then
+It reads the contents of the newly created file into a StringBuilder.
+It checks if the header line (first line) of the file contains the correct header format ("ID|TYPE|ASSET").
+If the header format is incorrect, it deletes the file and creates a new file with the correct header format.
+It writes the contents of the StringBuilder (including the header line) to the file.
