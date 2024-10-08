@@ -311,6 +311,23 @@ public interface GenericRepository<T, ID> {
     void deleteById(ID id);
 }
 
+(i) JpaRepository request :- When your application uses a JpaRepository, the JpaRepository delegates
+this operation to EntityManger, which interacts with the underlying DataSource for DB operations.
+
+(ii) EntityManager and DataSource : The EntityManager is configured to use a DataSource. Normally, this is a single 
+     DataSource, but when you need dynamic database routing, you set up an AbstractRoutingDataSource as the datasource
+in your configuration.
+
+(iii) AbstractRoutingDataSource :- its a special implementation of javax.sql.DataSource.that routes to different da
+ta sources based on some contextual information.
+
+AbstractRoutingDataSource.determineTargetSource() is called.
+determineCurrentLookupKey() is invoked to fetch the key(usual usually stored in a ThreadLocal like DataSourceContextHolder).
+
+
+Based pon the key, the corresponding DataSource is retreived from a map of data sources.
+The EntityManager uses this resolved DataSource to execute the query.
+
 
 
 
