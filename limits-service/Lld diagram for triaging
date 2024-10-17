@@ -1,32 +1,53 @@
 @startuml
-actor User
-participant "Orchestrator" as Orchestrator
-participant "App" as App
-participant "DB1" as DB1
-participant "DB2" as DB2
-participant "DB3" as DB3
+title configure() Method Sequence Diagram
 
-== User request initiated ==
+participant "RouteBuilder" as rb
+participant "Exchange" as ex
+participant "Processor" as pr
+participant "invokeRule" as ir
+participant "Command" as cmd
+participant "OrchestrationCommand" as orchCmd
+participant "ExecutorService" as es
 
-User -> Orchestrator: Request data
+== Initialization ==
+rb -> ex : initHeaders(exchange)
+rb -> orchCmd : getOrchestractionCommand(exchange)
+rb -> ir : invokeRule(PRE_PROCESS)
+note right: Orchestration pre-command
 
-== Orchestrator handling parallel tasks ==
+== Parallel Commands Execution ==
+rb -> pr : Loop - while executionLoopNotCompleted
+pr -> orchCmd : getCmdList()
+alt CmdList is not empty
+    pr -> orchCmd : getNextCommands()
+    pr -> ex : set(nextCmdList)
+    pr -> ex : split(nextCmdList)
+    es --> cmd : parallelExecution(cmd)
+    pr -> ir : invokeRule(PRE_PROCESS for command)
+    pr -> cmd : executeCommand()
+    pr -> ex : storeResponse
+else
+    pr -> ex : executionLoopNotCompleted = false
+end
 
-Orchestrator -> App: Call to fetch data (parallel)
-App -> DB1: Fetch data (parallel)
-App -> DB2: Fetch data (parallel)
-App -> DB3: Fetch data (parallel)
+== Post Processing ==
+alt No more commands
+    pr -> ir : invokeRule(POST_PROCESS)
+    pr -> ex : aggregateResponse
+else More sequences
+    pr -> ir : invokeRule(RESEQUENCER)
+    pr -> ex : getNextSequence
+end
 
-== Fetch results from databases ==
-
-DB1 --> App: Return data
-DB2 --> App: Return data
-DB3 --> App: Return data
-
-App --> Orchestrator: Return merged data
-
-== Return result to user ==
-
-Orchestrator -> User: Return final data
+== Command Execution ==
+rb -> pr : executeCommand
+pr -> cmd : checkSkipCommand
+alt Command not skipped
+    pr -> cmd : execute
+    pr -> ex : storeResult
+    pr -> ir : invokeRule(POST_PROCESS for cmd)
+else
+    pr -> ex : skipCommand
+end
 
 @enduml
