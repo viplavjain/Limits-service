@@ -1,0 +1,479 @@
+package com.anthem.wdss.api.gateway.orchestration.camel;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
+
+import org.apache.camel.CamelContext;
+import org.apache.camel.Exchange;
+import org.apache.camel.Processor;
+import org.apache.camel.ProducerTemplate;
+import org.apache.camel.builder.RouteBuilder;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.cxf.message.MessageContentsList;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.anthem.wdss.api.gateway.client.GateWayClient;
+import com.anthem.wdss.api.gateway.in.GateWayCommand;
+import com.anthem.wdss.api.gateway.in.OrchestrationCommand;
+import com.anthem.wdss.api.gateway.out.GateWayErrorInfo;
+import com.anthem.wdss.api.gateway.out.GateWayResponse;
+import com.anthem.wdss.api.gateway.rest.camel.helper.CamelConstants;
+import com.anthem.wdss.rulesengine.rulescore.engine.Rule;
+import com.anthem.wdss.rulesengine.rulescore.engine.RulesExecutionContext;
+import com.anthem.wdss.rulesengine.rulescore.engine.api.RulesEvaluatorImpl;
+import com.anthem.wdss.rulesengine.rulescore.repo.RulesRepository;
+
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * @author Rajesh Bose
+ *
+ */
+@Component
+@Slf4j
+public class CamelOrchstrationClient extends RouteBuilder implements GateWayClient {
+
+	@Autowired
+	private CamelContext camelContext;
+
+	@Autowired(required = false)
+	private RulesEvaluatorImpl rulesEvaluatorImpl;
+
+	@Autowired(required = false)
+	private RulesRepository rulesRepository;
+
+	public static final String EXECUTEDCMDS = "_executedCommands";
+	public static final String EXECUTIONRESULTS = "_executionResults";
+	public static final String EXECUTIONLOOPNOTCOMPLETED = "_executionLoopNotCompleted";
+	public static final String NEXTCMDLIST = "_nextCmdList";
+	public static final String NEXTCMDLISTSIZE = "_nextCmdListSize";
+	public static final String CMDRESPONSE = "_response";
+	public static final String CMDEXCEPTION = "_exception";
+	public static final String SKIPCOMMAND = "_skip";
+	public static final String SKIPALLCOMMAND = "_skipall";
+	public static final String SEQUENCEINEXECUTION = "_sequenceInExecution";
+	public static final String SEQUENCEMAP = "_sequenceMap";
+
+	ExecutorService orchestrationExecutorService = Executors.newFixedThreadPool(20);
+
+	/**
+	 * @author Rajesh Bose
+	 *
+	 */
+	enum OrchestrationRuleNames {
+		ORCHES_PRE_PROCESS("_orchestrationPreProcess"), ORCHES_POST_PROCESS("_orchestrationPostProcess"),
+		ORCHES_RESEQUENCER("_orchestrationResequencer"), CMD_PRE_PROCESS("_commandPreProcess"),
+		CMD_POST_PROCESS("_commandPostProcess"), CMD_PAYLOAD("_constructpayload"), CMD_EXCEPTION("_commandException"),
+		ORCHES_PARALLAL_ONCOMPLETION("_parallelOncompletion");
+
+		private String ruleName;
+
+		OrchestrationRuleNames(String ruleName) {
+			this.ruleName = ruleName;
+		}
+
+		public String getRuleName() {
+			return ruleName;
+		}
+
+		@Override
+		public String toString() {
+			return getRuleName();
+		}
+	}
+
+	/**
+	 *
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
+	public <R> GateWayResponse<R> executeCommand(GateWayCommand<?> cmd, Class<?> responseType,
+			Class<R> gateWayresponseType) {
+		camelContext.setTracing(false);
+		ProducerTemplate template = camelContext.createProducerTemplate();
+		OrchestrationCommand<?> camcmd = (OrchestrationCommand<?>) cmd;
+		HashMap<String, Object> headers = new HashMap<>();
+		Instant start = Instant.now();
+		headers.put(CamelConstants.GATEWAY_CMD, camcmd);
+		Object res = template.requestBodyAndHeaders("direct:orchestrationclient", camcmd.getPayload(), headers);
+		long exeTime = 	Duration.between(start, Instant.now()).toMillis();
+		log.info("=== Execution time for {} : RESPONSE TIME(ms) responseTime={}", camcmd.getCommandName(),exeTime);
+		try {
+			template.stop();
+		} catch (Exception e) {
+			log.warn("Error while stop the camel producer template " + e);
+		}
+		if (res != null) {
+			if (res instanceof GateWayResponse) {
+				return (GateWayResponse) res;
+			} else if (res instanceof MessageContentsList) {
+				return new GateWayResponse(true, ((MessageContentsList) res).get(0), null,exeTime);
+			} else {
+				if(res instanceof HashMap) {
+					/*
+					 * if (res instanceof HashMap && ((HashMap)
+					 * res).entrySet().stream().anyMatch(entry -> (entry instanceof
+					 * GateWayResponse<?> && (!((GateWayResponse<?>) entry).getStatus())))) {
+					 * 
+					 * return new GateWayResponse(false, res, null); }
+					 */
+					for(Map.Entry<String, Object>entry:((HashMap<String, Object>) res).entrySet()) {
+						if (entry.getValue() instanceof GateWayResponse && !((GateWayResponse<?>) entry.getValue()).getStatus()) {
+							return new GateWayResponse(false, res, null,exeTime);
+						}
+					}
+				}
+				return new GateWayResponse(true, res, null,exeTime);
+			}
+		} else {
+			return new GateWayResponse(false, null, new GateWayErrorInfo(new NullPointerException("response null")),
+					null,exeTime);
+		}
+	}
+
+	/**
+	 * 1) orchestration precommand 2) collect the parllal command first and execute
+	 * it as first step using direct:executeCommand 3) if no parllal then execute
+	 * the first command 4) resequence and do step 2 or 3 5) orchestration post
+	 * command 6) aggregate response 7) exception
+	 */
+	@Override
+	public void configure() throws Exception {
+		from("direct:orchestrationclient").process(new Processor() {
+			@Override
+			public void process(Exchange exchange) throws Exception {
+				initHeaders(exchange);
+				invokeRule(exchange, getOrchestractionCommand(exchange).getCommandName()
+						+ OrchestrationRuleNames.ORCHES_PRE_PROCESS);
+			}
+		}).loopDoWhile(header(CamelConstants.GATEWAY_CMD + EXECUTIONLOOPNOTCOMPLETED)).process(new Processor() {
+			public void process(Exchange exchange) {
+				if (CollectionUtils.isNotEmpty(getOrchestractionCommand(exchange).getCmdList())) {
+					List<? extends GateWayCommand<?>> nextCmdList = getNextCommands(exchange);
+					exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + NEXTCMDLIST, nextCmdList);
+					if (CollectionUtils.isEmpty(nextCmdList)) {
+						exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + EXECUTIONLOOPNOTCOMPLETED, false);
+						exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + NEXTCMDLISTSIZE, 0);
+					} else {
+						exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + NEXTCMDLISTSIZE, nextCmdList.size());
+					}
+				}
+			}
+		}).
+			  split(header(CamelConstants.GATEWAY_CMD +NEXTCMDLIST)).executorService(orchestrationExecutorService) 
+			  .parallelProcessing(true)
+			 .process(new Processor() {
+					@SuppressWarnings("unchecked")
+					@Override
+					public void process(Exchange exchange) throws Exception {
+						ArrayList<String> executedCmds = (ArrayList<String>) exchange.getIn()
+								.getHeader(CamelConstants.GATEWAY_CMD + EXECUTEDCMDS);
+						GateWayCommand<?> cmd = (GateWayCommand<?>) exchange.getIn().getBody();
+						log.info(" Command execution started " + cmd.getCommandName());
+						executedCmds.add(cmd.getCommandName());
+						exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + EXECUTEDCMDS, executedCmds);
+					}
+				}).to("direct:executegatewaycommand").process(new Processor() {
+					@SuppressWarnings("unchecked")
+					@Override
+					public void process(Exchange exchange) throws Exception {
+						GateWayCommand<?> cmd = (GateWayCommand<?>) exchange.getIn().getBody();
+						Object res = exchange.getIn().getHeader(cmd.getCommandName() + CMDRESPONSE);
+						HashMap<String, Object> resmap = (HashMap<String, Object>) exchange.getIn().getHeader(
+								CamelConstants.GATEWAY_CMD + EXECUTIONRESULTS, new HashMap<String, Object>());
+						if (res != null) {
+							resmap.put(cmd.getCommandName() + CMDRESPONSE, res);
+						}
+						HashMap<String, Boolean> skipmap = (HashMap<String, Boolean>) exchange.getIn()
+								.getHeader(CamelConstants.GATEWAY_CMD + SKIPCOMMAND, new HashMap<String, Boolean>());
+						for (Entry<String, Object> entry : exchange.getIn().getHeaders().entrySet()) {
+							if (entry.getKey().contains(SKIPCOMMAND) && entry.getValue() != null) {
+								if (entry.getValue() instanceof Boolean) {
+									skipmap.put(entry.getKey(), (Boolean) entry.getValue());
+								}
+							}
+						}
+					}
+				}).end().process(new Processor() {
+					@Override
+					public void process(Exchange exchange) throws Exception {
+						Integer next = (Integer) exchange.getIn()
+								.getHeader(CamelConstants.GATEWAY_CMD + NEXTCMDLISTSIZE);
+						Integer sequenceInExecution = (Integer) exchange.getIn()
+								.getHeader(CamelConstants.GATEWAY_CMD + SEQUENCEINEXECUTION);
+						if (next == 0) {
+							String orchepostName = getOrchestractionCommand(exchange).getCommandName()
+									+ OrchestrationRuleNames.ORCHES_POST_PROCESS.getRuleName();
+							invokeRule(exchange, orchepostName);
+							if (exchange.getIn().getHeader(orchepostName) != null) {
+								exchange.getIn().setBody(exchange.getIn().getHeader(orchepostName));
+							} else {
+								exchange.getIn().setBody(
+										exchange.getIn().getHeader(CamelConstants.GATEWAY_CMD + EXECUTIONRESULTS));
+							}
+						} else {
+							invokeRule(exchange, getOrchestractionCommand(exchange).getCommandName()
+									+ OrchestrationRuleNames.ORCHES_RESEQUENCER);
+							exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + SEQUENCEMAP,
+									getSequenceMap(exchange));
+							if (allCommandsExecutedInCurrentSequence(exchange)) {
+								Integer nextSeq = getNextSequence(exchange, sequenceInExecution);
+								log.info(" set Next Sequence " + nextSeq);
+								exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + SEQUENCEINEXECUTION, nextSeq);
+							}
+						}
+					}
+				}).end();
+
+		from("direct:executegatewaycommand").process(new Processor() {
+			@Override
+			public void process(Exchange exchange) throws Exception {
+				GateWayCommand<?> cmd = (GateWayCommand<?>) exchange.getIn().getBody();
+				invokeRule(exchange, cmd.getCommandName() + OrchestrationRuleNames.CMD_PRE_PROCESS);
+			}
+		}).process(new Processor() {
+			@SuppressWarnings({ "rawtypes", "unchecked" })
+			@Override
+			public void process(Exchange exchange) throws Exception {
+				GateWayCommand cmd = (GateWayCommand) exchange.getIn().getBody();
+				if (!isSkipCommand(exchange, cmd)) {
+					try {
+						cmd.setPayload(getPayload(exchange));
+						GateWayResponse<?> cmdres = cmd.executeCommand(cmd.getResponseType(),
+								cmd.getGtwyResponseType());
+						exchange.getIn().getHeaders().put(cmd.getCommandName() + CMDRESPONSE, cmdres);
+					} catch (Exception e) {
+						log.error("Error in execute command " + cmd.getCommandName());
+						exchange.getIn().getHeaders().put(cmd.getCommandName() + CMDEXCEPTION, e.getMessage());
+						invokeRule(exchange, cmd.getCommandName() + OrchestrationRuleNames.CMD_EXCEPTION);
+					}
+				} else {
+					log.info(cmd.getCommandName() + " skipped");
+				}
+			}
+		}).process(new Processor() {
+			@Override
+			public void process(Exchange exchange) throws Exception {
+				GateWayCommand<?> cmd = (GateWayCommand<?>) exchange.getIn().getBody();
+				if (!isSkipCommand(exchange, cmd)) {
+					OrchestrationCommand<?> orgcmd = (OrchestrationCommand<?>) exchange.getIn()
+							.getHeader(CamelConstants.GATEWAY_CMD);
+					invokeRule(exchange, cmd.getCommandName() + OrchestrationRuleNames.CMD_POST_PROCESS);
+					invokeRule(exchange, orgcmd.getCommandName() + OrchestrationRuleNames.ORCHES_PARALLAL_ONCOMPLETION);
+				}
+			}
+		}).end();
+	}
+
+	@SuppressWarnings("unchecked")
+	private boolean allCommandsExecutedInCurrentSequence(Exchange exchange) {
+		Set<String> sequenceExecutedCmds = ((ArrayList<String>) exchange.getIn()
+				.getHeader(CamelConstants.GATEWAY_CMD + EXECUTEDCMDS)).stream().collect(Collectors.toSet());
+		Integer sequenceInExecution = (Integer) exchange.getIn()
+				.getHeader(CamelConstants.GATEWAY_CMD + SEQUENCEINEXECUTION);
+		TreeMap<Integer, ArrayList<String>> sequenceMap = (TreeMap<Integer, ArrayList<String>>) exchange.getIn()
+				.getHeader(CamelConstants.GATEWAY_CMD + SEQUENCEMAP);
+		Set<String> sequenceCmds = sequenceMap.get(sequenceInExecution).stream().collect(Collectors.toSet());
+		if (sequenceInExecution != null && CollectionUtils.isNotEmpty(sequenceCmds)) {
+			for (String cmd : sequenceCmds) {
+				if (!sequenceExecutedCmds.contains(cmd)) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * @param exchange
+	 * @return
+	 */
+	private OrchestrationCommand<?> getOrchestractionCommand(Exchange exchange) {
+		OrchestrationCommand<?> orgcmd = (OrchestrationCommand<?>) exchange.getIn()
+				.getHeader(CamelConstants.GATEWAY_CMD);
+		return orgcmd;
+	}
+
+	/**
+	 * @param exchange
+	 * @param cmd
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	private boolean isSkipCommand(Exchange exchange, GateWayCommand<?> cmd) {
+		if (exchange != null && cmd != null) {
+			Object skip = exchange.getIn().getHeader(cmd.getCommandName() + SKIPCOMMAND);
+			if (skip != null && skip instanceof Boolean) {
+				return (Boolean) skip;
+			}
+			HashMap<String, Boolean> skipmap = (HashMap<String, Boolean>) exchange.getIn()
+					.getHeader(CamelConstants.GATEWAY_CMD + SKIPCOMMAND, new HashMap<String, Boolean>());
+			if(skipmap.containsKey(cmd.getCommandName()+SKIPCOMMAND)) {
+				return skipmap.get(cmd.getCommandName()+SKIPCOMMAND);
+			}else if(cmd.isSkip()) {
+				return true;
+			}
+			OrchestrationCommand<?> orgcmd = getOrchestractionCommand(exchange);
+			Object skipall = exchange.getIn().getHeader(orgcmd.getCommandName() + SKIPALLCOMMAND);
+			if (skipall != null && skipall instanceof Boolean) {
+				return (Boolean) skipall;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * @param exchange
+	 */
+	private void initHeaders(Exchange exchange) {
+		exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + EXECUTEDCMDS, new ArrayList<String>());
+		exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + EXECUTIONRESULTS, new HashMap<String, Object>());
+		exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + EXECUTIONLOOPNOTCOMPLETED, true);
+		exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + SEQUENCEMAP, getSequenceMap(exchange));
+		exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + SEQUENCEINEXECUTION, getNextSequence(exchange, -1));
+		exchange.getIn().setHeader(CamelConstants.GATEWAY_CMD + SKIPCOMMAND, new HashMap<String, Boolean>());
+	}
+
+	/**
+	 * @param exchange
+	 * @param sequenceInExecution
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	private Integer getNextSequence(Exchange exchange, Integer sequenceInExecution) {
+		if (exchange != null && sequenceInExecution != null) {
+			TreeMap<Integer, ArrayList<String>> sequenceMap = (TreeMap<Integer, ArrayList<String>>) exchange.getIn()
+					.getHeader(CamelConstants.GATEWAY_CMD + SEQUENCEMAP);
+			if (MapUtils.isNotEmpty(sequenceMap)) {
+				for (Integer k : sequenceMap.keySet()) {
+					if (k > sequenceInExecution) {
+						return k;
+					}
+				}
+			}
+		}
+		return -1;
+	}
+
+	/**
+	 * @param exchange
+	 * @return
+	 */
+	private TreeMap<Integer, ArrayList<String>> getSequenceMap(Exchange exchange) {
+		TreeMap<Integer, ArrayList<String>> sequenceMap = new TreeMap<Integer, ArrayList<String>>();
+		if (exchange != null) {
+			OrchestrationCommand<?> orcCmd = getOrchestractionCommand(exchange);
+			if (orcCmd != null && CollectionUtils.isNotEmpty(orcCmd.getCmdList())) {
+				for (GateWayCommand<?> cmd : orcCmd.getCmdList()) {
+					if (sequenceMap.get(cmd.getSequence()) == null) {
+						sequenceMap.put(cmd.getSequence(), new ArrayList<String>());
+					}
+					sequenceMap.get(cmd.getSequence()).add(cmd.getCommandName());
+				}
+			}
+		}
+		return sequenceMap;
+	}
+
+	/**
+	 * @param exchange
+	 * @param ruleName
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private void invokeRule(Exchange exchange, String ruleName) {
+		if (rulesEvaluatorImpl != null && rulesRepository!=null) {
+			//log.info("invoke stage rule " + ruleName);
+			if (StringUtils.isNotBlank(ruleName) && exchange != null) {
+				Optional<Rule> r = rulesRepository.getRuleByName(ruleName);
+				Map<String, Object> variables = new HashMap<>();
+				List<Rule> rules = new ArrayList<>();
+				if (r.isPresent()) {
+					OrchestrationCommand<?> orgcmd = (OrchestrationCommand<?>) exchange.getIn()
+							.getHeader(CamelConstants.GATEWAY_CMD);
+					variables.put("orchestrationPayload", orgcmd.getPayload());
+					variables.put("orchestrationCommand", orgcmd);
+					variables.put("gatewayCommand", exchange.getIn().getBody());
+					if (MapUtils.isNotEmpty(exchange.getIn().getHeaders())) {
+						exchange.getIn().getHeaders().forEach((k, v) -> {
+							variables.put(k, v);
+							if(k.equals(CamelConstants.GATEWAY_CMD + EXECUTIONRESULTS) && v!=null) {
+								variables.putAll((Map)v);
+							}else if(k.contains(CMDRESPONSE)) {
+								variables.put("gatewayCommand"+CMDRESPONSE, v);
+							}
+						});
+					}
+					rules.add(r.get());
+					RulesExecutionContext ctx = rulesEvaluatorImpl.evaluateRules(variables, rules);
+					if (MapUtils.isNotEmpty(ctx.getResult())) {
+						if (ctx.getResult().containsKey(ruleName)) {
+							exchange.getIn().setHeader(ruleName, ctx.getResult().get(ruleName));
+						}
+						ctx.getResult().forEach((k, v) -> {
+							if (k.endsWith(SKIPCOMMAND) || k.endsWith(SKIPALLCOMMAND)) {
+								exchange.getIn().setHeader(k, v);
+							}
+						});
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * @param exchange
+	 * @return
+	 */
+	private Object getPayload(Exchange exchange) {
+		OrchestrationCommand<?> orgcmd = getOrchestractionCommand(exchange);
+		GateWayCommand<?> cmd = (GateWayCommand<?>) exchange.getIn().getBody();
+		String ruleName = cmd.getCommandName() + OrchestrationRuleNames.CMD_PAYLOAD;
+		invokeRule(exchange, ruleName);
+		if (exchange.getIn().getHeader(ruleName) != null) {
+			return exchange.getIn().getHeader(ruleName);
+		}
+		return orgcmd.getPayload();
+	}
+
+	/**
+	 * @param cmdList
+	 * @param executedCmds
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	private List<? extends GateWayCommand<?>> getNextCommands(Exchange exchange) {
+		Integer sequenceInExecution = (Integer) exchange.getIn()
+				.getHeader(CamelConstants.GATEWAY_CMD + SEQUENCEINEXECUTION);
+		ArrayList<String> executedCmds = (ArrayList<String>) exchange.getIn()
+				.getHeader(CamelConstants.GATEWAY_CMD + EXECUTEDCMDS, new ArrayList<String>());
+		List<? extends GateWayCommand<?>>  cmdList = getOrchestractionCommand(exchange).getCmdList();
+		List<GateWayCommand<?>> nextCmdList = new ArrayList<>();
+		if (CollectionUtils.isNotEmpty(cmdList)) {
+			for (GateWayCommand<?> cmd : cmdList) {
+				if (cmd.getSequence() == sequenceInExecution) {
+					if (cmd.isAsync() && !executedCmds.contains(cmd.getCommandName())) {
+						nextCmdList.add(cmd);
+					} else if (!executedCmds.contains(cmd.getCommandName()) && CollectionUtils.isEmpty(nextCmdList)) {
+						nextCmdList.add(cmd);
+					}
+				}
+			}
+		}
+		return nextCmdList;
+	}
+
+}
