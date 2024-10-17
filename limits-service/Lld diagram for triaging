@@ -1,0 +1,32 @@
+@startuml
+actor User
+participant "Orchestrator" as Orchestrator
+participant "App" as App
+participant "DB1" as DB1
+participant "DB2" as DB2
+participant "DB3" as DB3
+
+== User request initiated ==
+
+User -> Orchestrator: Request data
+
+== Orchestrator handling parallel tasks ==
+
+Orchestrator -> App: Call to fetch data (parallel)
+App -> DB1: Fetch data (parallel)
+App -> DB2: Fetch data (parallel)
+App -> DB3: Fetch data (parallel)
+
+== Fetch results from databases ==
+
+DB1 --> App: Return data
+DB2 --> App: Return data
+DB3 --> App: Return data
+
+App --> Orchestrator: Return merged data
+
+== Return result to user ==
+
+Orchestrator -> User: Return final data
+
+@enduml
