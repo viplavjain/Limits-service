@@ -477,3 +477,26 @@ public class CamelOrchstrationClient extends RouteBuilder implements GateWayClie
 	}
 
 }
+
+------------------------------------------------------------------------------
+@Rule(name = ClinicalConstants.ORCH_ELIGIBILITY_CMD + "_orchestrationPostProcess", condition = {
+			"aggregareResponse" })
+	public GetClinicalDataResponse identifyQuesntionnaireOrchestrationPostProcess(
+			@Fact(name = "gtwyCmd_executionResults") Map<String, GateWayResponse<?>> responseMap,
+			@Fact(name = "orchestrationPayload") Map<String, Object> payload) {
+		GetClinicalDataResponse response = new GetClinicalDataResponse();
+		List<GateWayErrorInfo> errorInfo = getClinicalDataResponseException(responseMap);
+		if (errorInfo == null || CollectionUtils.isEmpty(errorInfo)) {
+			    String senderAppValue = (String) payload.get("senderApp");
+				if ((senderAppValue.equalsIgnoreCase(ClinicalConstants.HRS_META_SENDERAPP) || senderAppValue.equalsIgnoreCase(ClinicalConstants.DEFAULT_META_SENDERAPP))
+						&& isHrsContainsMemberSearchInfo(responseMap)) {
+					responseMap= responseMapWithNoMemberSearchInfoInHIP(responseMap);
+				}
+			response = getClinicalDataResponse(responseMap);
+		}
+	else {
+			return exceptionUtils.processGatewayErrorResponse(errorInfo);
+		}
+		return checkEmptyResponse(response);
+
+	}
