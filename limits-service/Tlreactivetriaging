@@ -1,0 +1,26 @@
+@startuml
+skinparam arrowColor Black
+skinparam rectangleColor LightGray
+skinparam shadowing false
+
+start
+:Event Trigger;
+
+:Initiate Observable Stream to handle parallel API calls;
+
+fork
+    :API Call - Fetch Data from API 1;
+    -> [Process API 1 Response] :Store data in Map (Key: API1, Value: Data);
+fork again
+    :API Call - Fetch Data from API 2;
+    -> [Process API 2 Response] :Store data in Map (Key: API2, Value: Data);
+fork again
+    :API Call - Fetch Data from API 3;
+    -> [Process API 3 Response] :Store data in Map (Key: API3, Value: Data);
+end fork
+
+:Combine Results into Map;
+
+:Output Aggregated Map with API data;
+stop
+@enduml
