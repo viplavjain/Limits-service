@@ -1,0 +1,1182 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.epc.inbound;
+
+
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.TimeZone;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.logging.log4j.Logger;
+import org.springframework.web.client.HttpClientErrorException.Unauthorized;
+
+import com.epc.inbound.couchbase.model.BusinessRequestModel;
+import com.epc.inbound.couchbase.service.BRTrackingService;
+import com.epc.inbound.couchbase.service.ImportService;
+import com.epc.inbound.emailservice.EmailNotificationService;
+import com.epc.inbound.service.JwtTokenService;
+import com.epc.inbound.util.InboundConstants;
+import com.epc.inbound.util.InboundUtility;
+import com.epc.inbound.util.PropertyFileUtil;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vzw.epc.mapper.amdocs.businessRequestApi.ApiClient;
+import com.vzw.epc.mapper.amdocs.businessRequestApi.api.BusinessRequestApi;
+import com.vzw.epc.mapper.amdocs.businessRequestApi.model.BusinessRequestDTO;
+import com.vzw.epc.mapper.amdocs.businessRequestApi.model.BusinessRequestSyncDetailsDTO;
+import com.vzw.epc.mapper.amdocs.businessRequestApi.model.BusinessRequestSyncStatusOutputDTO;
+import com.vzw.epc.mapper.amdocs.businessRequestApi.model.LocalizedStringDTO;
+import com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.api.BusinessValidationResultApi;
+import com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.api.TriggerPendingApi;
+import com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.model.ContextValidityStatus;
+import com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.model.ContextValidityStatus.ReasonEnum;
+import com.vzw.epc.mapper.amdocs.importApi.api.ImportJobControllerApi;
+import com.vzw.epc.mapper.amdocs.importApi.model.JobDTO;
+import com.vzw.epc.mapper.amdocs.releaseQueueApi.api.ReleaseQueueApi;
+
+
+
+
+
+
+/**
+ *
+ * @author V869125
+ */
+public class C1EntityManager {
+    //public static final String USERNAME = InputReader.getConfiguationPropertyValue("catalogoneUsername");
+    //public static final String PWD = InputReader.getConfiguationPropertyValue("catalogonePwd");
+    public static final String USERNAME = "username";
+    //public static final String PWD = InputReader.getConfiguationPropertyValue("c1pwd");
+    public static final String PWD = PropertyFileUtil.decrypt(InputReader.getConfiguationPropertyValue("catalogonePwd"));
+    public static final String CLIENT_ID = "client_id";
+    public static final String CONTENT_TYPE = "content-type";
+    public static final String CONTENT_TYPE_URLENCODED = "application/x-www-form-urlencoded";
+    public static final String CONTENT_TYPE_APPLICATION_JSON = "application/json";
+
+    public static final String CONTENT_LANGUAGE = "Content-Language";
+    public static final String CONTENT_LANGUAGE_EN_US = "en-US";
+    public static final String ACCEPT = "Accept";
+    public static final String AUTHORIZATION = "Authorization";
+    public static final String BEARER = "Bearer ";
+    public static final String CHARACTER_ENCODE = "UTF-8";
+    public static final String MULTIPART_FORMDATA = "multipart/form-data; boundary=";
+    public static final String CONTENT_DEPOSITION = "Content-Disposition";
+    public static final String ACCESS_TOKEN = "access_token";
+    public static final String GRANT_TYPE = "grant_type";
+    //public static final String CLIENT_ID = InputReader.getConfiguationPropertyValue("client_id");
+    public static final String HTTP_POST = "POST";
+    public static final String TOKEN_URL = InputReader.getConfiguationPropertyValue("c1LoginUrl");
+    ;
+    private static Logger log = BaseLogger.readLogPropertyFile(C1EntityManager.class);
+    private static final ObjectMapper mapper = new ObjectMapper();
+    private static String apiClientBRBaseURL = InboundUtility.getApiBasePath();
+    private static EmailNotificationService emailNotificationService;
+    //private static String token = C1EntityManager.getToken();
+
+    /**
+     * method for call login API to get accesstoken return accessToken - String
+     *
+     * @throws Exception
+     */
+    public static String getToken() throws Exception {
+
+        URL obj = null;
+        HttpURLConnection postConnection = null;
+        DataOutputStream wr = null;
+        BufferedReader in = null;
+
+        try {
+            boolean enableOpenIG = Boolean.parseBoolean(InputReader.getConfiguationPropertyValue("enableOpenIG"));
+            log.debug("enableOpenIG flag: {}", enableOpenIG);
+            if (enableOpenIG) {
+                return new JwtTokenService().getToken();
+            } else {
+                log.debug("****Inside LoginRequest Method****");
+                // getting login api which is in config file
+                String c1LoginUrl = InputReader.getConfiguationPropertyValue("c1LoginUrl");
+                String userName = InputReader.getConfiguationPropertyValue("catalogoneUsername");
+                //String catalogonePwd = InputReader.getConfiguationPropertyValue("catalogonePwd");
+                String catalogonePwd = PropertyFileUtil.decrypt(InputReader.getConfiguationPropertyValue("catalogonePwd"));
+                String grantType = InputReader.getConfiguationPropertyValue("grant_type");
+                String clientId = InputReader.getConfiguationPropertyValue("client_id");
+                obj = new URL(c1LoginUrl);
+                postConnection = (HttpURLConnection) obj.openConnection();
+
+                postConnection.setRequestMethod(HTTP_POST);
+                postConnection.setRequestProperty(CONTENT_TYPE, CONTENT_TYPE_URLENCODED);
+
+
+                String urlParameters = GRANT_TYPE + "=" + grantType + "&" + USERNAME + "=" + userName + "&" + PWD + "=" + catalogonePwd + "&" + CLIENT_ID + "=" + clientId;
+                log.info("urlParameters:::" + urlParameters);
+                byte[] postData = urlParameters.getBytes(StandardCharsets.UTF_8);
+                int postDataLength = postData.length;
+                postConnection.setRequestProperty("charset", "utf-8");
+                postConnection.setRequestProperty("Content-Length", Integer.toString(postDataLength));
+                postConnection.setDoOutput(true);
+                postConnection.setInstanceFollowRedirects(false);
+                try {
+                    wr = new DataOutputStream(postConnection.getOutputStream());
+                    wr.write(postData);
+                } catch (Exception e) {
+                    log.error("Exception caught inside loginRequest::" + e.getMessage());
+                }
+                int responseCode = postConnection.getResponseCode();
+                log.debug("Login api response code: " + responseCode);
+
+                //HttpsURLConnection.HTTP_OK
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+
+                    in = new BufferedReader(new InputStreamReader(postConnection.getInputStream()));
+                    String inputLine;
+                    StringBuilder response = new StringBuilder();
+
+                    while ((inputLine = in.readLine()) != null) {
+                        response.append(inputLine);
+                    }
+
+                    String responseContent = response.toString();
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    JsonNode rootNode = objectMapper.readTree(responseContent);
+                    String accessToken = rootNode.get("access_token").asText();
+                    log.debug("accessToken:::" + accessToken);
+                    //createBr("epc_test", accessToken);
+                    return accessToken;
+
+                } else {
+                    log.debug("POST NOT WORKED");
+                    return null;
+                }
+            }
+        } catch (Exception e) {
+            log.error("Exception in login method:{} ", e.getMessage());
+            throw e;
+
+        } finally {
+            try {
+                //close connections if open
+                if (null != postConnection) postConnection.disconnect();
+                if (null != wr) wr.close();
+                if (null != in) in.close();
+            } catch (IOException ioe) {
+                log.error("Exception in login method when trying to close connections:{} ",
+                        ExceptionUtils.getStackTrace(ioe));
+                throw ioe;
+            }
+        }
+
+
+    }
+
+
+    /**
+     * method for call create BR API to get Br Id
+     *
+     * @param brName-    String
+     * @param authToken- String return brId - String
+     */
+    public static String createBr(String brName, String authToken) throws Exception {
+        log.info("Br Creation started!!");
+        log.info("Br Name: " + brName);
+        log.debug("Auth Token: " + authToken);
+        LocalTime start = LocalTime.now();
+        ApiClient apiClient = new ApiClient();
+        try {
+            BusinessRequestDTO brObj = new BusinessRequestDTO();
+            List<LocalizedStringDTO> name = new ArrayList<>();
+            LocalizedStringDTO localeObj = new LocalizedStringDTO();
+            localeObj.setLocale("en-US");
+            localeObj.setValue(brName);
+            name.add(localeObj);
+            brObj.setName(name);
+			/*
+			DateFormat formatter = new SimpleDateFormat("dd-MMM-yy hh.mm.ss.sss a");
+			formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+	        String today = formatter.format(new java.util.Date());
+	        log.info("System date:::::"+today);
+	        OffsetDateTime date = OffsetDateTime.parse(InboundUtility.getUTCToLocalDateForBR(today),
+	                DateTimeFormatter.ISO_DATE_TIME);
+			String dueDate = date.toString();
+			log.info("due date:::"+date.toString());
+			String[] dateSplit = dueDate.split(":");
+			String token = "";
+			if (dateSplit.length > 0) {
+				token = dateSplit[dateSplit.length - 1];
+			}
+			if (dateSplit.length == 2 && token.length() == 3) {
+				String s = dueDate.substring(0, dueDate.toString().length() - 1) + ":00Z";
+				brObj.setDueDate(s);
+				log.debug(s);
+			} else {
+				brObj.setDueDate(dueDate);
+			}
+			*/
+
+            //******   Starts Here *******/
+
+            DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.sss'Z'");
+            formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+            Date dt = new Date();
+            String dueDate = formatter.format(dt);
+
+            //Ends here
+            brObj.setDueDate(dueDate);
+            brObj.setId("");
+            List<LocalizedStringDTO> description = new ArrayList<>();
+            LocalizedStringDTO localeObjForDesc = new LocalizedStringDTO();
+            localeObjForDesc.setLocale("en-US");
+            localeObjForDesc.setValue("string");
+            description.add(localeObjForDesc);
+            brObj.setDescription(description);
+            brObj.setType("default");
+            //brObj.setOwner("epc_user");
+            String str = mapper.writeValueAsString(brObj);
+            log.info("Br Object: {}" + str);
+
+            apiClient.addDefaultHeader("authorization", "Bearer " + authToken);
+            apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+            apiClient.setBasePath(apiClientBRBaseURL + InboundConstants.CREATE_BR_URL);
+            BusinessRequestApi businessRequestApi = new BusinessRequestApi(apiClient);
+            BusinessRequestDTO businessRequestDTO = null;
+            businessRequestDTO = businessRequestApi.createBR(brObj, false);
+            log.info("BR response:\n" + mapper.writeValueAsString(businessRequestDTO));
+            if (businessRequestDTO != null) {
+                String brId = businessRequestDTO.getId();
+                log.info("Br Id:" + brId);
+                LocalTime end = LocalTime.now();
+                Duration duration = Duration.between(start, end);
+                log.info("The duration of create br:" + duration.getSeconds() + " seconds");
+                return brId;
+            }
+        } catch (Exception ex) {
+            log.error("Exception in create br {}", ex.getMessage());
+            emailNotificationService.send(apiClient.getBasePath(), ex.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * method for import zip to BR
+     *
+     * @param authToken   - String
+     * @param brId-       String
+     * @param zipFilePath - String
+     */
+
+    public static int countfiles(String zipFilePath) throws IOException {
+        ZipFile zip = new ZipFile(PropertyFileUtil.getNormalizedFileName(zipFilePath));
+        final Enumeration<? extends ZipEntry> entries = zip.entries();
+        int numRegularFiles = 0;
+        while (entries.hasMoreElements()) {
+            if (!entries.nextElement().isDirectory()) {
+                ++numRegularFiles;
+            }
+        }
+        return numRegularFiles;
+    }
+
+    public static BusinessRequestModel importBr(String authToken, String brId, String zipFilePath, String feedName) throws Exception {
+        LocalTime start = LocalTime.now();
+        BusinessRequestModel businessRequestModel = new BusinessRequestModel();
+        log.debug("Import br method call for zip file importing");
+        String apiName = "";
+        try {
+            File zipFile = new File(PropertyFileUtil.getNormalizedFileName(zipFilePath));
+            boolean exists = zipFile.exists();
+            if (exists) {
+                log.debug("Zipped file path: " + zipFile);
+                log.debug("Zipped file exist in the above speicifed path");
+                log.info("Br Id :" + brId);
+                if (zipFilePath.contains(".zip")) {
+                    log.info("no of files:" + countfiles(zipFilePath));
+                }
+                com.vzw.epc.mapper.amdocs.importApi.ApiClient apiClient = new com.vzw.epc.mapper.amdocs.importApi.ApiClient();
+                apiClient.addDefaultHeader("authorization", "Bearer " + authToken);
+                apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+                apiClient.setBasePath(InputReader.getConfiguationPropertyValue("c1basePath") + InboundConstants.IMPORT_BR_URL);
+                apiClient.setDebugging(Boolean.parseBoolean(InputReader.getConfiguationPropertyValue("c1DebugEnabled")));
+                apiName = apiClient.getBasePath();
+                ImportJobControllerApi importJobApi = new ImportJobControllerApi(apiClient);
+                log.debug("importJobApi::::" + importJobApi);
+                JobDTO importJob = importJobApi.importJob(brId, zipFile);
+                //log.debug("importJobDTO Response: ");
+                log.info("importJobDTO Response::::" + mapper.writeValueAsString(importJob));
+                log.info("Br Name :" + importJob.getBusinessRequestName());
+                LocalTime end = LocalTime.now();
+                Duration duration = Duration.between(start, end);
+
+                log.info("The duration of import br:" + duration.getSeconds() + " seconds");
+                if (importJob != null) {
+                    businessRequestModel.setImportStatus(importJob.getStatus().toString());
+                    businessRequestModel.setImportId(importJob.getId());
+                    businessRequestModel.setBrId(brId);
+                    businessRequestModel.setFeedType(feedName);
+                    Timestamp startTimeStamp = new Timestamp(System.currentTimeMillis());
+                    businessRequestModel.setStartTime(startTimeStamp.getTime());
+                    return businessRequestModel;
+                }
+            } else {
+                log.debug("Zipped file path: " + zipFilePath);
+                log.debug("Zipped file doesn't exist in the above speicifed path");
+            }
+        } catch (Exception ex) {
+            //emailNotificationService.send(apiName, ex.getMessage());
+            log.error("Exception: {}", ex.getMessage());
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unused")
+	/*public static void triggerValidationsAndPublish() {
+		BusinessRequestModel businessRequestModel = null;
+		ImportService importService = new ImportService();
+		ArrayList<String> pendingBRs = importService.getPendingImportBRs();
+		log.info("pendingBRs::"+pendingBRs);
+		for (String brId : pendingBRs) {
+			String token = getToken();
+			if(null != token) {
+				//String importId = importService.getImportId(brId);
+				businessRequestModel = importService.getBusinessRequestModel(brId);
+				String importId = businessRequestModel.getImportId();
+				String importStatus = getImportStatus(importId,token);
+				//String brId = businessRequestModel.getBrId();
+				if("SUCCESS".equalsIgnoreCase(importStatus)) {
+						LocalTime start = LocalTime.now();
+						String status = syncStatus(brId);
+						if(null != status && status.equalsIgnoreCase("BR NOT FOUND")) {
+							importService.deleteBR(brId);
+						}else{
+						com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.ApiClient apiClient = new com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.ApiClient();
+						//apiClient.addDefaultHeader("authorization", "Bearer "+token);
+						 apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("apiEnvHeaderValue"));
+						//TriggerPendingApi triggerPendingApi = new TriggerPendingApi(apiClient);
+						try {
+					        //System.out.println("status== "+status);
+					       // com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.ApiClient apiClient1 = new com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.ApiClient();
+					        apiClient.addDefaultHeader("authorization", "Bearer "+C1EntityManager.getToken());
+					        apiClient.setBasePath(apiClientBRBaseURL+InboundConstants.VALIDATION_BR_URL);
+					        BusinessValidationResultApi businessValidationResultApi = new BusinessValidationResultApi(apiClient);
+					        ContextValidityStatus checkContextValidityStatus = businessValidationResultApi.checkContextValidityStatus(brId, null, null, null, "LOCAL");
+					        log.debug("checkContextValidityStatus:::"+checkContextValidityStatus);
+					        if(null != checkContextValidityStatus && checkContextValidityStatus.getStatus().toString().equals("INVALID")) {
+					        	List<ReasonEnum> reason = checkContextValidityStatus.getReason();
+					        	ArrayList<String> reasonList = new ArrayList<String>();
+					        	for(int i =0; i<reason.size();i++) {
+					        		ReasonEnum reasonEnum = reason.get(i);
+						        	String value = reasonEnum.getValue();
+					        		reasonList.add(value);
+					        	}
+					        	
+					        	log.info("Reason:::"+checkContextValidityStatus.getReason());
+					        	if(reasonList.contains("PENDING_MANUAL_TRIGGER") && !reasonList.contains("VALIDATION_IN_PROGRESS")) {
+					        		LocalTime end = LocalTime.now();
+									Duration duration = Duration.between(start, end);
+					        		TriggerPendingApi triggerPendingApi = new TriggerPendingApi(apiClient);
+					    			triggerPendingApi.triggerPendingManualValidations(brId, null,"production",false);
+					    			log.debug("Manual validation triggered");
+					    			log.info("The duration of validating"+brId +" BR:::"+duration.getSeconds()+" seconds");
+					        	}
+					        }else if(null != checkContextValidityStatus && checkContextValidityStatus.getStatus().toString().equals("VALID")) {
+					        	LocalTime end = LocalTime.now();
+								if(!getBlockStatus()) {
+									publishBusinessRequest(brId);
+									Duration duration = Duration.between(start, end);
+						        	log.info("The duration of publishing "+brId +" BR:::"+duration.getSeconds()+" seconds");
+						        	if(null != businessRequestModel) {
+										businessRequestModel.setImportStatus(importStatus);
+										importService.updateStatus(brId, businessRequestModel);
+									}else {
+										businessRequestModel = new BusinessRequestModel();
+										businessRequestModel.setBrId(brId);
+										businessRequestModel.setImportId(importId);
+										businessRequestModel.setImportStatus(importStatus);
+										businessRequestModel.setInboundPublishStatus(true);
+										importService.updateStatus(brId, businessRequestModel);
+									}
+								}else {
+									log.info("some br is in being published stage");
+								}
+					        	
+					        }
+					        
+						} catch (Exception e) {
+							log.error("Exception occred during triggerPendingManualValidations::" + e.getMessage());
+						}
+				}
+				}else if("FAILED".equalsIgnoreCase(importStatus)){
+					businessRequestModel.setImportStatus(importStatus);
+					importService.updateStatus(brId, businessRequestModel);
+					log.info("Import Job failed");
+				}
+			}else {
+				log.info("Not able to get Token");
+			}
+			
+		}
+	}*/
+    public static BusinessRequestModel importSecondPhaseBR(String authToken, String brId, String zipFilePath, String feedName, BusinessRequestModel businessRequestModel) throws Exception {
+        LocalTime start = LocalTime.now();
+        log.debug("Import br method call for zip file importing");
+        com.vzw.epc.mapper.amdocs.importApi.ApiClient apiClient = new com.vzw.epc.mapper.amdocs.importApi.ApiClient();
+        try {
+            File zipFile = new File(zipFilePath);
+            boolean exists = zipFile.exists();
+            if (exists) {
+                log.debug("Zipped file path: " + zipFile);
+                log.debug("Zipped file exist in the above speicifed path");
+                log.info("Br Id :" + brId);
+                if (zipFilePath.contains(".zip")) {
+                    log.info("no of files:" + countfiles(zipFilePath));
+                }
+
+                apiClient.addDefaultHeader("authorization", "Bearer " + authToken);
+                apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+                apiClient.setBasePath(InputReader.getConfiguationPropertyValue("c1basePath") + InboundConstants.IMPORT_BR_URL);
+                apiClient.setDebugging(Boolean.parseBoolean(InputReader.getConfiguationPropertyValue("c1DebugEnabled")));
+                ImportJobControllerApi importJobApi = new ImportJobControllerApi(apiClient);
+                log.debug("importJobApi::::" + importJobApi);
+                JobDTO importJob = importJobApi.importJob(brId, zipFile);
+                //log.debug("importJobDTO Response: ");
+                log.info("importJobDTO Response::::" + mapper.writeValueAsString(importJob));
+                //log.info("Br Name :"+importJob.getBusinessRequestName());
+                LocalTime end = LocalTime.now();
+                Duration duration = Duration.between(start, end);
+
+                log.info("The duration of import br:" + duration.getSeconds() + " seconds");
+                if (importJob != null) {
+                    businessRequestModel.setImportStatus(importJob.getStatus().toString());
+                    businessRequestModel.setImportId(importJob.getId());
+                    businessRequestModel.setBrId(brId);
+                    //businessRequestModel.setFeedType(feedName);
+                    //Timestamp startTimeStamp = new Timestamp(System.currentTimeMillis());
+                    //businessRequestModel.setStartTime(startTimeStamp.getTime());
+                    return businessRequestModel;
+                }
+            } else {
+                log.debug("Zipped file path: " + zipFilePath);
+                log.debug("Zipped file doesn't exist in the above speicifed path");
+            }
+        } catch (Exception ex) {
+            //emailNotificationService.send(apiClient.getBasePath(), ex.getMessage());
+            log.error("Exception: {}", ex.getMessage());
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unused")
+    public static String triggerValidationsAndPublish() {
+        try {
+            BRTrackingService brTrackingService = new BRTrackingService();
+            BusinessRequestModel businessRequestModel = null;
+            ImportService importService = new ImportService();
+            ArrayList<String> distinctFeedType = importService.getDistinctFeedType();
+            log.info("distinctFeedType" + distinctFeedType);
+            for (int i = 0; i < distinctFeedType.size(); i++) {
+                ArrayList<String> importFalseBRs = getImportFalseBRs(distinctFeedType.get(i));
+                log.info("importFalseBRs:: FeedType:: {} {}", importFalseBRs, distinctFeedType.get(i));
+                ArrayList<String> importPendingBRs = getImportPendingBrs(distinctFeedType.get(i));
+                log.info("importPendingBRs:: FeedType:: {} {}", importPendingBRs, distinctFeedType.get(i));
+                ArrayList<String> importSuccessBRs = getImportSuccessBrs(distinctFeedType.get(i));
+                log.info("importSuccessBRs:: FeedType:: {} {}", importSuccessBRs, distinctFeedType.get(i));
+                ArrayList<String> inboundPublishBRs = getInboundPublishBRs(distinctFeedType.get(i));
+                log.info("Inbound publish BRs:: FeedType:: {} {}", inboundPublishBRs, distinctFeedType.get(i));
+                ArrayList<String> inboundNotPublishBRs = getInboundNotPublishBRs(distinctFeedType.get(i));
+                log.info("inboundNotPublishBRs:: FeedType:: {} {}", inboundNotPublishBRs, distinctFeedType.get(i));
+
+
+                if (inboundPublishBRs.size() > 0) {
+                    Long timeStamp = getBrTimeStamp(inboundPublishBRs.get(0));
+                    businessRequestModel = getBusinessRequestModel(timeStamp.toString());
+                    String brAvailableStatus = syncStatus(inboundPublishBRs.get(0), C1EntityManager.getToken());
+                    if (null != brAvailableStatus && brAvailableStatus.equalsIgnoreCase("BR NOT FOUND")) {
+                        //Long timeStamp = getBrTimeStamp(inboundPublishBRs.get(0));
+                        log.info("*********Found BR Id:: {} BR Status:: {} *********", inboundPublishBRs.get(0), "BR Id is not available in UI");
+                        log.info("BR timestamp " + timeStamp.toString());
+                        deleteBR(timeStamp);
+                    } else {
+                        //below line added to handle Pending publish status issue
+                        if (!businessRequestModel.isDelta()) {
+                            String status = getBrStatus(inboundPublishBRs.get(0), C1EntityManager.getToken());
+                            log.info("*********Found BR Id:: {} BR Status:: {} *********", inboundPublishBRs.get(0), status);
+                            if (null != status && status.equalsIgnoreCase("PUBLISHED")) {
+                                //publishBusinessRequest(importSuccessBRs.get(0));
+                                businessRequestModel.setPublishStatus(true);
+                            } else if (null != status && status.equalsIgnoreCase("FAILED_PUBLISHING")) {
+                                businessRequestModel.setPublishStatus(true);
+                            } else {
+                                businessRequestModel.setPublishStatus(false);
+                            }
+                            updateStatus(timeStamp, businessRequestModel);
+                        }
+                    }
+                }
+
+                //int brToBePublishedCount = getBrToBePublishedCount();
+                boolean brCreatedFlag = false;
+                if (importFalseBRs.size() != 0 && importPendingBRs.size() == 0 /* && inboundNotPublishBRs.size() == 0 */
+                        && importSuccessBRs.size() == 0 /* && brToBePublishedCount == 0 */) {
+                    Long timeStamp = getBrTimeStamp(importFalseBRs.get(0));
+                    log.info("create new actual BR timeStamp::" + timeStamp);
+                    businessRequestModel = getBusinessRequestModel(timeStamp.toString());
+
+                    String folderName = businessRequestModel.getBrName();
+                    String status = C1BRManager.handleBrSecondphase(businessRequestModel.getFeedType(), folderName, businessRequestModel);
+                    log.info("ImportStatus is::" + status);
+                    log.info("*********Found BR Id::{} BR Status:: {} *********", importFalseBRs.get(0), "DRAFT");
+                }
+
+                if (importPendingBRs.size() != 0 && importSuccessBRs.size() == 0) {
+                    Long timeStamp = getBrTimeStamp(importPendingBRs.get(0));
+                    log.info(" imported file creatd br timeStampList::" + timeStamp);
+
+                    String brAvailableStatus = syncStatus(importPendingBRs.get(0), C1EntityManager.getToken());
+                    if (null != brAvailableStatus && brAvailableStatus.equalsIgnoreCase("BR NOT FOUND")) {
+                        //Long timeStamp = getBrTimeStamp(inboundPublishBRs.get(0));
+                        log.info("*********Found BR Id:: {} BR Status:: {} *********", importPendingBRs.get(0), "BR Id is not available in UI");
+                        log.info("BR timestamp " + timeStamp.toString());
+                        deleteBR(timeStamp);
+                        businessRequestModel = getBusinessRequestModel(timeStamp.toString());
+                        if (businessRequestModel.isDelta()) {
+                            updateFeedTypeStatusBucket(businessRequestModel);
+                        }
+                    } else {
+                        businessRequestModel = getBusinessRequestModel(timeStamp.toString());
+                        String importStatus = getImportStatus(businessRequestModel.getImportId(), C1EntityManager.getToken());
+                        log.info("*********Found BR Id:: {} Import Status:: {} *********", importPendingBRs.get(0), importStatus);
+                        log.info("*********Found BR Id:: {} BR Status:: {} *********", importPendingBRs.get(0), "DRAFT");
+                        if ("SUCCESS".equalsIgnoreCase(importStatus)) {
+                            LocalTime start = LocalTime.now();
+                            String status = syncStatus(importPendingBRs.get(0), C1EntityManager.getToken());
+                            if (null != status && status.equalsIgnoreCase("BR NOT FOUND")) {
+                                //Long timeStamp = getBrTimeStamp(importPendingBRs.get(0));
+                                log.info("BR timestamp " + timeStamp.toString());
+                                deleteBR(timeStamp);
+                                if (businessRequestModel.isDelta()) {
+                                    updateFeedTypeStatusBucket(businessRequestModel);
+                                }
+                            } else {
+                                try {
+                                    String validationStatus = checkValidityStatus(importPendingBRs.get(0), businessRequestModel, C1EntityManager.getToken());
+                                    businessRequestModel.setValidationStatus(validationStatus);
+                                    businessRequestModel.setImportStatus(importStatus);
+                                    updateStatus(businessRequestModel.getStartTime(), businessRequestModel);
+                                } catch (Exception e) {
+                                    log.error("Exception occred during triggerPendingManualValidations::" + e.getMessage());
+                                }
+                            }
+                        } else if ("FAILED".equalsIgnoreCase(importStatus)) {
+                            businessRequestModel.setImportStatus(importStatus);
+                            updateStatus(businessRequestModel.getStartTime(), businessRequestModel);
+                            log.info("Import Job failed");
+
+                        }
+                    }
+                }
+
+                if (importSuccessBRs.size() > 0) {
+                    String status = syncStatus(importSuccessBRs.get(0), C1EntityManager.getToken());
+                    if (null != status && status.equalsIgnoreCase("BR NOT FOUND")) {
+                        log.info("*********Found BR Id::{} BR Id is available in UI**************", importSuccessBRs.get(0));
+                        Long timeStamp = getBrTimeStamp(importSuccessBRs.get(0));
+                        log.info("BR timestamp " + timeStamp.toString());
+                        deleteBR(timeStamp);
+						/*businessRequestModel = getBusinessRequestModel(timeStamp.toString());
+						if (businessRequestModel.isDelta()) {
+							updateFeedTypeStatusBucket(businessRequestModel);
+						}*/
+                    } else {
+                        String brstatus = getBrStatus(importSuccessBRs.get(0), C1EntityManager.getToken());
+                        log.info("*********Found BR Id::{} BR Status:: {} *********" + importSuccessBRs.get(0), brstatus);
+                        Long timeStamp = getBrTimeStamp(importSuccessBRs.get(0));
+                        log.info("imported success timeStamp::" + timeStamp);
+                        businessRequestModel = getBusinessRequestModel(timeStamp.toString());
+                        businessRequestModel.setStartTime(timeStamp);
+                       // if (null != brstatus && brstatus.equalsIgnoreCase("FAILED_PUBLISHING")) {
+                        if (null != brstatus && brstatus.equalsIgnoreCase("DRAFT")) {
+                            String validationStatus = checkValidityStatus(importSuccessBRs.get(0), businessRequestModel, C1EntityManager.getToken());
+                            //businessRequestModel.setValidationStatus(validationStatus);
+                            if (validationStatus.equals("VALID")) {
+                                log.info("Ready to publish:::asset name:::" + distinctFeedType.get(i));
+                                log.info("*********Found Ready to publish:::BR ID :::{} *********", importSuccessBRs.get(0));
+                                LocalTime start = LocalTime.now();
+                                //if(!getBlockStatus(importSuccessBRs.get(0),getReusableToken(token))) {
+                                boolean triggerValidationAndPublish = Boolean.parseBoolean(InputReader.getConfiguationPropertyValue("triggerValidationsAndPublish"));
+                                if(triggerValidationAndPublish) {
+                                    if (!getBlockStatus(importSuccessBRs.get(0), getToken())) {
+                                        Long brCount = new SearchRequestAdapter().getNonSharedBRCount(importSuccessBRs.get(0));
+                                        log.info("Count in search response::: {}", brCount);
+                                        if (brCount != null) {
+                                            boolean isBrPresent = brCount > 0 ? true : false;
+
+                                            if (isBrPresent) {
+                                                boolean enableShareAPIFlag = Boolean.parseBoolean(InputReader.getConfiguationPropertyValue("enableShareAPI"));
+                                                if (enableShareAPIFlag) {
+                                                    if (!businessRequestModel.getShareStatus()) {
+                                                        shareBR(importSuccessBRs.get(0), C1EntityManager.getToken());
+                                                    }
+                                                }
+                                                publishBusinessRequest(importSuccessBRs.get(0), C1EntityManager.getToken());
+                                                log.info("*********Found BR ID :::{} Published from Inbound *********", importSuccessBRs.get(0));
+                                                LocalTime end = LocalTime.now();
+                                                Duration duration = Duration.between(start, end);
+                                                log.info("The duration of publishing " + importSuccessBRs.get(0) + " BR:::" + duration.getSeconds() + " seconds");
+                                                businessRequestModel.setValidationStatus(validationStatus);
+                                                businessRequestModel.setInboundPublishStatus(true);
+                                                updateStatus(businessRequestModel.getStartTime(), businessRequestModel);
+                                            } else {
+                                                cancelBR(importSuccessBRs.get(0), C1EntityManager.getToken());
+                                                businessRequestModel.setValidationStatus(validationStatus);
+                                                businessRequestModel.setInboundPublishStatus(true);
+                                                businessRequestModel.setPublishStatus(true);
+                                                updateStatus(businessRequestModel.getStartTime(), businessRequestModel);
+
+                                                if (businessRequestModel.isDelta()) {
+                                                    updateFeedTypeStatusBucket(businessRequestModel);
+                                                }
+
+                                                //deletBR(importSuccessBRs.get(0));
+                                            }
+                                        }
+
+
+                                    } else {
+                                        log.info("some br is in being published stage");
+                                    }
+                                }
+
+                                //WorkAround for api failure
+                                if(!triggerValidationAndPublish) {
+                                    publishBusinessRequest(importSuccessBRs.get(0), C1EntityManager.getToken());
+                                    log.info("*********Found BR ID :::{} Published from Inbound *********", importSuccessBRs.get(0));
+                                    LocalTime end = LocalTime.now();
+                                    Duration duration = Duration.between(start, end);
+                                    log.info("The duration of publishing " + importSuccessBRs.get(0) + " BR:::" + duration.getSeconds() + " seconds");
+                                    businessRequestModel.setValidationStatus(validationStatus);
+                                    businessRequestModel.setInboundPublishStatus(true);
+                                    updateStatus(businessRequestModel.getStartTime(), businessRequestModel);
+                                }
+
+                            }
+                        } else {
+                            businessRequestModel.setInboundPublishStatus(true);
+                            updateStatus(businessRequestModel.getStartTime(), businessRequestModel);
+                            //update the flags in couchbase
+                            //need confirmation which flag to be updated
+                        }
+                    }
+                }
+
+                if(importPendingBRs != null && importPendingBRs.isEmpty() && importPendingBRs.size() == 0
+                        && inboundNotPublishBRs != null && inboundNotPublishBRs.isEmpty() && inboundNotPublishBRs.size() == 0
+                        && importSuccessBRs != null && importSuccessBRs.isEmpty() && importSuccessBRs.size() == 0) {
+                    ArrayList<String> latestPublishedBRForFeedType = getLatestPublishedBRForFeedType(distinctFeedType.get(i));
+                    log.info("latestPublishedBRForFeedType:: FeedType:: {} {}", latestPublishedBRForFeedType, distinctFeedType.get(i));
+                    if (latestPublishedBRForFeedType != null && !latestPublishedBRForFeedType.isEmpty() && latestPublishedBRForFeedType.size() > 0) {
+                        log.info("latestPublishedBRForFeedType:: : latestPublishedBRForFeedType size : "+latestPublishedBRForFeedType.size());
+                        Long timeStamp = getBrTimeStamp(latestPublishedBRForFeedType.get(0));
+                        businessRequestModel = getBusinessRequestModel(timeStamp.toString());
+                        log.info("latestPublishedBRForFeedType:: outside loop : businessRequestModel : "+businessRequestModel);
+                        String status = getBrStatus(latestPublishedBRForFeedType.get(0), C1EntityManager.getToken());
+                        log.info("*********Found BR Id:: {} BR Status:: {} *********", latestPublishedBRForFeedType.get(0), status);
+                        if (null != status && status.equalsIgnoreCase("PUBLISHED")) {
+                            log.info("latestPublishedBRForFeedType:: if loop : status : "+status);
+                            businessRequestModel.setPublishStatus(true);
+                            log.info("latestPublishedBRForFeedType:: if loop : businessRequestModel : "+businessRequestModel);
+                            updateStatus(businessRequestModel.getStartTime(), businessRequestModel);
+                            updateFeedTypeStatusBucket(businessRequestModel);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Exception inside trigger validation and publish method {}", e);
+            return "Inbound Exception";
+        }
+        return "success";
+    }
+
+    private static void updateFeedTypeStatusBucket(BusinessRequestModel businessRequestModel) {
+        BRTrackingService brTrackingService = new BRTrackingService();
+        String updatestatus = brTrackingService.updateFeedTypeStatus(
+                businessRequestModel.getFeedType(), false, null, businessRequestModel.getBrId());
+        for (int k = 0; k < 5; k++) {
+            if (updatestatus != null && updatestatus.contains("TIMEOUT")) {
+                updatestatus = brTrackingService.updateFeedTypeStatus(
+                        businessRequestModel.getFeedType(), false, null, businessRequestModel.getBrId());
+            }
+        }
+
+    }
+
+
+    /*
+     * private static String getReusableToken(String reusabletoken) {
+     * if(Boolean.parseBoolean(InputReader.getConfiguationPropertyValue(
+     * "reusableTokenFlag")) && ! StringUtils.isEmpty(reusabletoken)) { return
+     * reusabletoken; }else { token = C1EntityManager.getToken(); return token; } }
+     */
+
+    private static int getBrToBePublishedCount() {
+        ImportService importService = new ImportService();
+        int count = importService.getBrToBePublishedCount();
+        log.info("BR to be published count::" + count);
+        for (int k = 0; k < 5; k++) {
+            if (count == -1) {
+                count = importService.getBrToBePublishedCount();
+            }
+        }
+        return count;
+    }
+
+    private static void deleteBR(Long timeStamp) {
+        ImportService importService = new ImportService();
+        int status = importService.deleteBR(timeStamp);
+        for (int k = 0; k < 5; k++) {
+            if (status == -1) {
+                status = importService.deleteBR(timeStamp);
+            }
+        }
+    }
+
+
+    public static void updateStatus(Long timeStamp, BusinessRequestModel businessRequestModel) {
+        try {
+            log.info("Time Stamp::" + timeStamp);
+            log.info("BusinessRequest Model::" + mapper.writeValueAsString(businessRequestModel));
+            ImportService importService = new ImportService();
+            String updateStatus = importService.updateStatus(businessRequestModel.getStartTime(), businessRequestModel);
+            for (int k = 0; k < 5; k++) {
+                if (updateStatus.equals("TIMEOUT")) {
+                    updateStatus = importService.updateStatus(businessRequestModel.getStartTime(), businessRequestModel);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Exception inside C1EntityManager updateStatus:::{}", e.getMessage());
+        }
+    }
+
+    private static ArrayList<String> getImportFalseBRs(String feedType) {
+        ImportService importService = new ImportService();
+        ArrayList<String> importFalseBRs = importService.getImportFalseBRs(feedType);
+        //log.info("importFalseBRs::"+importFalseBRs);
+        for (int k = 0; k < 5; k++) {
+            if (importFalseBRs.contains("TIMEOUT")) {
+                importFalseBRs = importService.getImportFalseBRs(feedType);
+            }
+        }
+        return importFalseBRs;
+    }
+
+    private static ArrayList<String> getImportPendingBrs(String feedType) {
+        ImportService importService = new ImportService();
+        ArrayList<String> importPendingBRs = importService.getImportPendingBRs(feedType);
+        //log.info("importPendingBrs::"+importPendingBRs);
+        for (int k = 0; k < 5; k++) {
+            if (importPendingBRs.contains("TIMEOUT")) {
+                importPendingBRs = importService.getImportPendingBRs(feedType);
+            }
+        }
+        return importPendingBRs;
+    }
+
+    private static ArrayList<String> getImportSuccessBrs(String feedType) {
+        ImportService importService = new ImportService();
+        ArrayList<String> importSuccessBRs = importService.getImportSuccessBRs(feedType);
+        //log.info("importSuccessBRs::"+importSuccessBRs);
+        for (int k = 0; k < 5; k++) {
+            if (importSuccessBRs.contains("TIMEOUT")) {
+                importSuccessBRs = importService.getImportSuccessBRs(feedType);
+            }
+        }
+        return importSuccessBRs;
+    }
+
+    private static ArrayList<String> getInboundPublishBRs(String feedType) {
+        ImportService importService = new ImportService();
+        ArrayList<String> inboundPublishBRs = importService.getInboundPublishBRs(feedType);
+        //log.info("inboundPublishBRs::"+inboundPublishBRs);
+        for (int k = 0; k < 5; k++) {
+            if (inboundPublishBRs.contains("TIMEOUT")) {
+                inboundPublishBRs = importService.getInboundPublishBRs(feedType);
+            }
+        }
+        return inboundPublishBRs;
+    }
+
+    private static ArrayList<String> getLatestPublishedBRForFeedType(String feedType) {
+        ImportService importService = new ImportService();
+        ArrayList<String> latestPublishedBRForFeedType = importService.getLatestPublishedBRForFeedType(feedType);
+        log.info("getLatestPublishedBRForFeedType::"+latestPublishedBRForFeedType);
+        for (int k = 0; k < 5; k++) {
+            if (latestPublishedBRForFeedType.contains("TIMEOUT")) {
+                latestPublishedBRForFeedType = importService.getLatestPublishedBRForFeedType(feedType);
+            }
+        }
+        return latestPublishedBRForFeedType;
+    }
+
+    private static ArrayList<String> getInboundNotPublishBRs(String feedType) {
+        ImportService importService = new ImportService();
+        ArrayList<String> inboundNotPublishBRs = importService.getInboundNotPublishBRs(feedType);
+        //log.info("inboundNotPublishBRs::"+inboundNotPublishBRs);
+        for (int k = 0; k < 5; k++) {
+            if (inboundNotPublishBRs.contains("TIMEOUT")) {
+                inboundNotPublishBRs = importService.getInboundNotPublishBRs(feedType);
+            }
+        }
+        return inboundNotPublishBRs;
+    }
+
+    private static BusinessRequestModel getBusinessRequestModel(String timeStamp) {
+        ImportService importService = new ImportService();
+        BusinessRequestModel businessRequestModel = importService.getBusinessRequestModel(timeStamp);
+        for (int k = 0; k < 5; k++) {
+            if (businessRequestModel.getBrId() != null && businessRequestModel.getBrId().contains("TIMEOUT")) {
+                businessRequestModel = importService.getBusinessRequestModel(timeStamp);
+            }
+        }
+        return businessRequestModel;
+
+    }
+
+    /*
+     * private static ArrayList<Long> getTimeStamps(String feedType, String
+     * importStatus, boolean inboundPublishStatus){
+     *
+     * ImportService importService = new ImportService(); ArrayList<Long>
+     * timeStampList =
+     * importService.getTimeStamps(feedType,importStatus,inboundPublishStatus);
+     * for(int k=0;k<5 ;k++) { if(timeStampList.contains("0L")) { timeStampList =
+     * importService.getTimeStamps(feedType,importStatus,inboundPublishStatus); } }
+     * return timeStampList;
+     *
+     * }
+     */
+    private static Long getBrTimeStamp(String brId) {
+
+        ImportService importService = new ImportService();
+        Long timeStamp = importService.getBRTimeStamp(brId);
+        for (int k = 0; k < 5; k++) {
+            if (timeStamp == 0L) {
+                timeStamp = importService.getBRTimeStamp(brId);
+            }
+        }
+        return timeStamp;
+    }
+
+
+    public static String checkValidityStatus(String brId, BusinessRequestModel businessRequestModel, String token) throws Exception {
+        String status = "INVALID";
+        com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.ApiClient apiClient = new com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.ApiClient();
+        try {
+            apiClient.addDefaultHeader("authorization", "Bearer " + token);
+            apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+            apiClient.setBasePath(apiClientBRBaseURL + InboundConstants.VALIDATION_BR_URL);
+            apiClient.setDebugging(Boolean.parseBoolean(InputReader.getConfiguationPropertyValue("c1DebugEnabled")));
+            BusinessValidationResultApi businessValidationResultApi = new BusinessValidationResultApi(apiClient);
+            ContextValidityStatus checkContextValidityStatus = businessValidationResultApi.checkContextValidityStatus(brId, null, null, null, "LOCAL");
+            log.info("checkContextValidityStatus:::" + checkContextValidityStatus);
+            if (null != checkContextValidityStatus && checkContextValidityStatus.getStatus().toString().equals("INVALID")) {
+                List<ReasonEnum> reason = checkContextValidityStatus.getReason();
+                ArrayList<String> reasonList = new ArrayList<String>();
+                for (int j = 0; j < reason.size(); j++) {
+                    ReasonEnum reasonEnum = reason.get(j);
+                    String value = reasonEnum.getValue();
+                    reasonList.add(value);
+                }
+
+                log.debug("Reason:::" + checkContextValidityStatus.getReason());
+                if (reasonList.contains("PENDING_MANUAL_TRIGGER") && !reasonList.contains("VALIDATION_IN_PROGRESS")) {
+                    LocalTime start = LocalTime.now();
+                    TriggerPendingApi triggerPendingApi = new TriggerPendingApi(apiClient);
+                    triggerPendingApi.triggerPendingManualValidations(brId, null, "production", false);
+                    LocalTime end = LocalTime.now();
+                    Duration duration = Duration.between(start, end);
+                    log.debug("Manual validation triggered");
+                    log.info("The duration of validating" + brId + " BR:::" + duration.getSeconds() + " seconds");
+                    status = "PENDING_MANUAL_TRIGGER";
+                } else if (reasonList.contains("VALIDATION_IN_PROGRESS")) {
+                    status = "VALIDATION_IN_PROGRESS";
+                } else if (reasonList.contains("ISSUES_WITH_ERRORS")) {
+                    status = "ISSUES_WITH_ERRORS";
+                    if (!businessRequestModel.getShareStatus()) {
+                        shareBR(brId, token);
+                        businessRequestModel.setShareStatus(true);
+                        businessRequestModel.setInboundPublishStatus(true);
+                        businessRequestModel.setObBRStatus("IB VALIDATION ISSUE");
+                        updateStatus(businessRequestModel.getStartTime(), businessRequestModel);
+					/*if (businessRequestModel.isDelta()) {
+						updateFeedTypeStatusBucket(businessRequestModel);
+					}*/
+                    }
+                }
+            } else if (null != checkContextValidityStatus && checkContextValidityStatus.getStatus().toString().equals("VALID")) {
+                status = "VALID";
+            }
+        } catch (Unauthorized ex) {
+            log.error("Unauthorized Exception inside checkValidityStatus::" + ex.getMessage());
+            //return checkValidityStatus(brId,businessRequestModel,getReusableToken(null));
+        } catch (Exception e) {
+            //emailNotificationService.send(apiClient.getBasePath(), e.getMessage());
+            throw e;
+        }
+        return status;
+    }
+
+    @SuppressWarnings("deprecation")
+    public static String syncStatus(String brId, String token) {
+        String syncStatus = null;
+        //emailNotificationService = new EmailNotificationService();
+        ApiClient apiClient = new ApiClient();
+        try {
+
+            apiClient.addDefaultHeader("authorization", "Bearer " + getToken());
+            apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+            apiClient.setBasePath(apiClientBRBaseURL + InboundConstants.CREATE_BR_URL);
+            BusinessRequestApi businessRequestApi = new BusinessRequestApi(apiClient);
+            BusinessRequestSyncDetailsDTO synchronizeBR = businessRequestApi.synchronizeBR(brId, "WORKSTREAM");
+            log.info("syncStatus  response {}", synchronizeBR);
+        } catch (Unauthorized ex) {
+            log.error("Unauthorized Exception inside syncStatus::" + ex.getMessage());
+            //syncStatus(brId,getReusableToken(null));
+        } catch (Exception e) {
+            //e.printStackTrace();
+            if (e.getMessage().contains("Could not find business request with id:")) {
+                log.info("couldnot find the BR" + brId);
+                syncStatus = "BR NOT FOUND";
+            } else {
+                log.error("Inbound Exception during syncStatus:::{}", e.getMessage());
+            }
+            //emailNotificationService.send(apiClient.getBasePath(),e.getMessage());
+        }
+        return syncStatus;
+    }
+
+    public static Boolean getBlockStatus(String brId, String token) throws Exception {
+        boolean isBlocked = true;
+        ApiClient apiClient = new ApiClient();
+        try {
+		/*com.vzw.epc.mapper.amdocs.catalogManagementApi.ApiClient apiClient = new com.vzw.epc.mapper.amdocs.catalogManagementApi.ApiClient();
+		apiClient.addDefaultHeader("authorization", "Bearer "+getToken());
+		apiClient.setBasePath(apiClientBRBaseURL+InboundConstants.GET_BLOCKED_STATUS_URL);
+		CatalogManagementApi catalogManagementApi = new CatalogManagementApi(apiClient);
+		CatalogManagementBlockDTO blockStatus = catalogManagementApi.getBlockStatus();
+		log.info("Blockstatus::::"+mapper.writeValueAsString(blockStatus));
+		if(null != blockStatus) {
+			isBlocked = blockStatus.isIsBlockedToPublish();
+			log.info(" Environment blockStatus :::"+isBlocked);
+		}*/
+
+            apiClient.addDefaultHeader("authorization", "Bearer " + token);
+            apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+            apiClient.setBasePath(apiClientBRBaseURL + InboundConstants.CREATE_BR_URL);
+            BusinessRequestApi businessRequestApi = new BusinessRequestApi(apiClient);
+            BusinessRequestSyncStatusOutputDTO synchronizationStatusofBR = businessRequestApi.synchronizationStatusofBR(brId);
+            log.info(mapper.writeValueAsString("Sync Publish status of environment::" + synchronizationStatusofBR));
+            if (synchronizationStatusofBR.getPublishingBusinessRequest() == null) {
+                isBlocked = false;
+            }
+        } catch (Unauthorized ex) {
+            log.error("Unauthorized Exception inside getBlockStatus::{}", ex.getMessage());
+            //return getBlockStatus(brId,getReusableToken(null));
+        } catch (Exception e) {
+            //emailNotificationService.send(apiClient.getBasePath(), e.getMessage());
+            log.error("Exception inside inside getBlockStatus:: {} ", e.getMessage());
+            throw e;
+        }
+        return isBlocked;
+    }
+
+
+    public static String getImportStatus(String importid, String token) throws Exception {
+        String status = null;
+        com.vzw.epc.mapper.amdocs.importApi.ApiClient apiClient = new com.vzw.epc.mapper.amdocs.importApi.ApiClient();
+        try {
+
+
+            apiClient.addDefaultHeader("authorization", "Bearer " + token);
+            apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+            apiClient.setBasePath(apiClientBRBaseURL + InboundConstants.IMPORT_BR_URL);
+            apiClient.setDebugging(Boolean.parseBoolean(InputReader.getConfiguationPropertyValue("c1DebugEnabled")));
+            ImportJobControllerApi importJobControllerApi = new ImportJobControllerApi(apiClient);
+            JobDTO jobInfo = importJobControllerApi.getJobInfo(importid);
+            if (null != jobInfo) {
+                status = jobInfo.getStatus().toString();
+                log.info("Import ID:::" + importid + " Import Status:::" + status);
+                if (null != jobInfo) {
+                    status = jobInfo.getStatus().toString();
+                    log.info("Import ID:::" + importid
+                            + " Import Status:::" + status
+                            + " Number of files ::::" + jobInfo.getTotalNumberOfFiles()
+                            + "Total processed files :::: " + jobInfo.getTotalNumberOfProcessedFiles()
+                            + "Total failed files :::: " + jobInfo.getTotalNumberOfFailedFiles()
+                            + "Total files with warning ::::" + jobInfo.getTotalNumberOfFilesInWarningStatus()
+                    );
+                    if (status.equals("SUCCESS") && jobInfo.getTotalNumberOfFailedFiles() > 0) {
+                        log.info("Setting the BR to failed status as number of failed files is greated than zero");
+                        status = "FAILED";
+                    }
+                }
+            }
+        } catch (Unauthorized ex) {
+            log.error("Unauthorized Exception inside getImportStatus::" + ex.getMessage());
+            //return getImportStatus(importid,getReusableToken(null));
+        } catch (Exception e) {
+            //emailNotificationService.send(apiClient.getBasePath(), e.getMessage());
+            log.error("Exception inside getImportStatus :: {}", e.getMessage());
+            throw e;
+        }
+        return status;
+    }
+    /*
+     * public static String getBusinessValidationIssuesWithFixData(String
+     * brId,String authToken) { String status = null;
+     * com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.ApiClient apiClient =
+     * new com.vzw.epc.mapper.amdocs.businessRequestValidationAPI.ApiClient();
+     * apiClient.addDefaultHeader("authorization", "Bearer "+authToken);
+     * BusinessValidationResultApi businessValidationResultApi = new
+     * BusinessValidationResultApi(apiClient); try { BusinessValidationIssueResponse
+     * businessValidationIssuesWithFixData =
+     * businessValidationResultApi.getBusinessValidationIssuesWithFixData(brId, 0,
+     * 100, null, null, null, null, null, null);
+     * if(businessValidationIssuesWithFixData.getBusinessValidationIssues().size()
+     * == 0) { //publishBR(brId); status = "success"; }else { status = "failure"; }
+     * log.info("businessValidationIssuesWithFixData:::" +
+     * businessValidationIssuesWithFixData); } catch (Exception e) {
+     * log.error("Exception occred during triggerPendingManualValidations::" +
+     * e.getMessage()); } return status; }
+     */
+
+    public static void shareBR(String brId, String token) throws Exception {
+        ApiClient apiClient = new ApiClient();
+        apiClient.addDefaultHeader("authorization", "Bearer " + token);
+        apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+        apiClient.setBasePath(apiClientBRBaseURL + InboundConstants.CREATE_BR_URL);
+        apiClient.setDebugging(Boolean.parseBoolean(InputReader.getConfiguationPropertyValue("c1DebugEnabled")));
+        BusinessRequestApi businessRequestApi = new BusinessRequestApi(apiClient);
+        try {
+            businessRequestApi.shareToBR(brId);
+            log.info("Shared   :: For BR " + brId);
+        } catch (Unauthorized ex) {
+            log.error("Unauthorized Exception inside shareBR::" + ex.getMessage());
+            //shareBR(brId,getReusableToken(null));
+        } catch (Exception e) {
+            //emailNotificationService.send(apiClient.getBasePath(), ExceptionUtils.getStackTrace(e));
+            log.error("Exception inside inside shareBR:: {} ", e.getMessage());
+            throw e;
+        }
+    }
+
+    public static void cancelBR(String brId, String token) throws Exception {
+        ApiClient apiClient = new ApiClient();
+        apiClient.addDefaultHeader("authorization", "Bearer " + token);
+        apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+        apiClient.setBasePath(apiClientBRBaseURL + InboundConstants.CREATE_BR_URL);
+        BusinessRequestApi businessRequestApi = new BusinessRequestApi(apiClient);
+        try {
+            businessRequestApi.cancelBR(brId);
+            log.info("Canceled   :: For BR {}", brId);
+        } catch (Unauthorized ex) {
+            log.error("Unauthorized Exception inside cancelBR::{}", ex.getMessage());
+            //cancelBR(brId,getReusableToken(null));
+        } catch (Exception e) {
+            //emailNotificationService.send(apiClient.getBasePath(), ExceptionUtils.getStackTrace(e));
+            log.error("Exception inside inside cancelBR:: {} ", e.getMessage());
+            throw e;
+        }
+    }
+
+    public static void deletBR(String brId, String token) throws Exception {
+        ApiClient apiClient = new ApiClient();
+        apiClient.addDefaultHeader("authorization", "Bearer " + token);
+        apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+        apiClient.setBasePath(apiClientBRBaseURL + InboundConstants.CREATE_BR_URL);
+        BusinessRequestApi businessRequestApi = new BusinessRequestApi(apiClient);
+        try {
+            businessRequestApi.deleteBR(brId);
+            log.info("Deleted   :: For BR {}", brId);
+        } catch (Unauthorized ex) {
+            log.error("Unauthorized Exception inside deletBR::{}", ex.getMessage());
+            //deletBR(brId,getReusableToken(null));
+        } catch (Exception e) {
+            //emailNotificationService.send(apiClient.getBasePath(), ExceptionUtils.getStackTrace(e));
+            log.error(e.getMessage());
+            throw e;
+        }
+    }
+
+    public static void publishBusinessRequest(String brId, String token) throws Exception {
+        log.info("Inside publishBusinessRequest::::" + brId);
+        //ApiClient apiClient = new ApiClient();
+        //apiClient.addDefaultHeader("authorization", "Bearer "+token);
+        //apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+        //apiClient.setBasePath(apiClientBRBaseURL+InboundConstants.CREATE_BR_URL);
+        //apiClient.setDebugging(Boolean.parseBoolean(InputReader.getConfiguationPropertyValue("c1DebugEnabled")));
+        //BusinessRequestApi businessRequestApi = new BusinessRequestApi(apiClient);
+        com.vzw.epc.mapper.amdocs.releaseQueueApi.ApiClient apiClient2 = new com.vzw.epc.mapper.amdocs.releaseQueueApi.ApiClient();
+        apiClient2.addDefaultHeader("authorization", "Bearer " + token);
+        apiClient2.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+        apiClient2.setBasePath(apiClientBRBaseURL + "/catalogManagement/releaseManagement");
+        apiClient2.setDebugging(Boolean.parseBoolean(InputReader.getConfiguationPropertyValue("c1DebugEnabled")));
+        ReleaseQueueApi apQueueApi = new ReleaseQueueApi(apiClient2);
+        try {
+            apQueueApi.publishReleaseQueue(brId, false);
+            //businessRequestApi.publishBR(brId, true);
+        } catch (Unauthorized ex) {
+            log.error("Unauthorized Exception inside publishBusinessRequest::" + ex.getMessage());
+            //publishBusinessRequest(brId,getReusableToken(null));
+        } catch (Exception e) {
+            log.error("Exception inside inside publishBusinessRequest:: {} ", e.getMessage());
+            //emailNotificationService.send(apiClient.getBasePath(), e.getMessage());
+            throw e;
+        }
+    }
+
+    public static String getBrStatus(String brId, String token) throws Exception {
+        log.info("inside getbr status");
+        String status = null;
+        ApiClient apiClient = new ApiClient();
+        apiClient.addDefaultHeader("authorization", "Bearer " + token);
+        apiClient.addDefaultHeader("env", InputReader.getConfiguationPropertyValue("env"));
+        apiClient.setBasePath(apiClientBRBaseURL + InboundConstants.CREATE_BR_URL);
+        BusinessRequestApi businessRequestApi = new BusinessRequestApi(apiClient);
+        try {
+            BusinessRequestDTO br = businessRequestApi.getBR(brId);
+            log.info("BR Details   ::  " + br + " For BR " + brId);
+            if(br != null) {
+                log.info("BR Status   ::  " + br.getStatus() + " For BR " + brId);
+                status = br.getStatus().toString();
+            }
+        } catch (Unauthorized ex) {
+            log.error("Unauthorized Exception inside getBrStatus::" + ex.getMessage());
+            //return getBrStatus(brId,getReusableToken(null));
+        } catch (Exception e) {
+            log.error("Exception inside inside getbr status:: {} ", e.getMessage());
+            //emailNotificationService.send(apiClient.getBasePath(), e.getMessage());
+            throw e;
+        }
+        return status;
+    }
+
+}
