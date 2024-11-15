@@ -1,0 +1,1741 @@
+create or replace PACKAGE BODY                                       DMD_PKG_GEN_OMNI_FEED
+ As
+   g_rec_found      Boolean := false;
+   g_feed_gen_succ  Boolean := false;
+   Function f_get_sku_type(p_sku_code   Varchar2)
+     Return Varchar2 as
+   ln_tmp_cnt       Number(6);
+   unlock_class5  Varchar2(3);
+   Begin
+        Select count(*) Into ln_tmp_cnt
+         From im_eg_equipment
+        Where inventory_id = p_sku_code and new_retail_sku='Y';;
+
+        If ln_tmp_cnt > 0 Then
+            Return 'Retail';
+        End If;
+
+        Select count(*) Into ln_tmp_cnt
+         From item
+        Where itm_part   = p_sku_code
+          And itm_class5 = 'FRU';
+
+        If ln_tmp_cnt > 0 Then
+            Return 'CLNR';
+        End If;
+
+        If p_sku_code like 'B2B%' Then
+            Return 'B2B';
+        End If;
+
+        If p_sku_code like 'OCPO%' Then
+            Return 'OCPO';
+        End If;
+
+        Select count(*) Into ln_tmp_cnt
+         From item
+        Where itm_part               = p_sku_code
+          And Nvl(itm_class5, 'NA') <> 'ISL'
+            And itm_class1           = 'PHO'
+          And itm_class2            In ('CFE', 'CMM', 'CSM','CSA','CSR','CNB','CMD');
+
+        If ln_tmp_cnt > 0 Then
+            Return 'CPO';
+        End If;
+
+		Select count(*) Into ln_tmp_cnt
+		From item
+		Where itm_part = p_sku_code
+		And itm_class5 = 'RNT';
+
+		If ln_tmp_cnt > 0 Then
+			Return 'RNT';
+		End If;
+
+       Select itm_class5  Into unlock_class5
+	   From item
+       Where  itm_part = p_sku_code;
+
+	   If unlock_class5 = 'UNL' Then
+            Return 'UNL';
+        End If;
+
+        Return ' ';
+   End f_get_sku_type;
+
+   Procedure sp_write_clob_2_file( p_clob  In Clob
+                                 , p_file  In utl_file.file_type) As
+   l_char_buffer    Varchar2(32767);
+   l_amount         Binary_Integer := 32760;
+   l_pos            Number(12);
+   l_clob_len       Number(12);
+   Begin
+        l_clob_len := dbms_lob.getlength(p_clob);
+        l_pos := 1;
+
+        While l_pos < l_clob_len loop
+            dbms_lob.read(p_clob, l_amount, l_pos, l_char_buffer);
+            utl_file.put(p_file, l_char_buffer);
+            utl_file.fflush(p_file);
+            l_pos := l_pos + l_amount;
+        End Loop;
+
+        utl_file.new_line(p_file);
+   End sp_write_clob_2_file;
+
+   Procedure sp_print_device_info( p_device_sku    In Varchar2
+                                 , p_eff_beg_dt    In Date
+                                 , p_print_started In Out Boolean
+                                 , p_outfile       In utl_file.file_type) As
+        lc_dest_clob_xml Clob;
+        lc_tmp_clob      Clob;
+        l_rec_found      Boolean;
+        l_prod_name_list string_array;
+        Begin
+
+        If p_device_sku Is Not Null and length(trim(p_device_sku)) > 0 Then
+            Select distinct prod_name
+              Bulk Collect Into l_prod_name_list
+              From sku_dacc o
+             Where sku_code = trim(p_device_sku)
+               -- And Upper(prod_name) Not Like '%SIM%'
+               And Not Exists (Select 1 From dmd_universal_api_data d
+                                Where d.device_sku   = o.sku_code
+                                  And d.device_mask In ('4GS', '4GK','5GM','5GS'));
+        ElsIf p_eff_beg_dt Is Not Null Then
+            Select distinct prod_name
+              Bulk Collect Into l_prod_name_list
+              From omni_feed_changes o
+             Where last_update_dt >= p_eff_beg_dt
+               --And Upper(prod_name) Not Like '%SIM%'
+               And Not Exists (Select 1 From dmd_universal_api_data d
+                                Where d.prod_name   = o.prod_name
+                                  And d.device_mask In ('4GS', '4GK','5GM','5GS'))
+            Union
+            Select distinct mp.prod_name
+              From model_product mp, ( Select i.itm_part, i.itm_class1, i.itm_class2, i.itm_class3, i.itm_class4, i.itm_class5
+                                            , i.itm_bta_eligible, i.itm_upc, i.itm_prepay_sku, i.itm_wave_eligible, i.itm_dpc_group
+                                            , i.itm_dpc_item, i.itm_last_cost, i.itm_upc_full, i.itm_device_cap, i.instant_credit_eligible
+                                            , i.ispu_eligible
+                                         From item i
+                                        Minus
+                                       Select i.itm_part, i.itm_class1, i.itm_class2, i.itm_class3, i.itm_class4, i.itm_class5
+                                            , i.itm_bta_eligible, i.itm_upc, i.itm_prepay_sku, i.itm_wave_eligible, i.itm_dpc_group
+                                            , i.itm_dpc_item, i.itm_last_cost, i.itm_upc_full, i.itm_device_cap, i.instant_credit_eligible
+                                            , i.ispu_eligible
+                                         From item_bkp i) i
+            Where mp.model_id  = itm_part
+              -- And Upper(mp.prod_name) Not Like '%SIM%';
+              And Not Exists (Select 1 From dmd_universal_api_data d
+                               Where d.device_sku   = mp.model_id
+                                 And d.device_mask In ('4GS', '4GK','5GM','5GS'));
+        Else
+            Select distinct prod_name
+              Bulk Collect Into l_prod_name_list
+              From launch_package o
+             Where Not Exists (Select 1 From dmd_universal_api_data d
+                                Where d.prod_name   = o.prod_name
+                                  And d.device_mask In ('4GS', '4GK','5GM','5GS'));
+        End If;
+
+        l_rec_found := false;
+        For rec in (
+            Select XMLElement( "deviceInfo"
+                     , XMLForest( l.prod_name                                 as "prodName"
+                                , l.device_family_name                        as "familyName"
+                                , l.mfg_code                                  as "mfgCode"
+--                                , COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name) as "mfgName"     --BQVT-1709 --bqvt-1874
+--                                , '<![CDATA['||COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name)||']]>'   as "mfgName"     --BQVT-1709 --bqvt-1874
+                                , XMLCDATA(COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name)) as "mfgName"
+                                , Nvl(e.prod_type, ' ')                       as "prodType"
+                                , Nvl(ie.equip_name, ' ')                     as "imProdName"
+                                , Nvl(ie.main_image, ' ')                     as "imImageUrl"
+                                , Nvl(ie.Device_Category, ' ')                as "imDeviceCategory"
+                                , Nvl(d.device_mask, ' ')                     as "deviceType"
+                                , Nvl(f.global_phone, ' ')                    as "globalPhone"
+                                , Nvl(l.device_category, ' ')                 as "deviceCategory"
+                                , Nvl(t.dcat, ' ')                            as "deviceCapabilityInd"
+                                , Nvl(f.ba, ' ')                              as "backupAssistCapable"
+                                , ( Select nvl(max(sc.sim_sku), ' ')
+                                      from sim_4g_compatible_marketing sc
+                                     Where sc.preferred_sim  = 'Y'
+                                       And sc.prod_name      = l.prod_name
+                                       And sc.mfg_code       = l.mfg_code
+                                       And sc.effective_date = l.effective_date) as "preferredSim"
+                                 , ( Select nvl(max(sc.sim_sku), ' ')
+                                      from sim_4g_compatible_marketing sc
+                                     Where sc.preferred_soft_sim  = 'Y'
+                                       And sc.prod_name      = l.prod_name
+                                       And sc.mfg_code       = l.mfg_code
+                                       And sc.effective_date = l.effective_date) as "preferredSoftSim",
+                                       ( Select nvl(max(sc.sim_sku), ' ')
+                                      from sim_4g_compatible_marketing sc
+                                     Where sc.alternate_sim  = 'Y'
+                                       And sc.prod_name      = l.prod_name
+                                       And sc.mfg_code       = l.mfg_code
+                                       And sc.effective_date = l.effective_date) as "alternateSim"
+                                , Nvl(ph.sim_class_4g, ' ')     as "simClass4G"
+                                , Nvl(f.nfc_capable, ' ')       as "nfcCapable"
+                                , Nvl(f.nfc_compatible, ' ')    as "nfcCompatible"
+                                --, Nvl(f.nfc_isis_wallet, ' ')   as "nfcIsisWalletCapable"
+                                , DECODE(f.mobile_messaging, '2WSMS/MO','Y', 'N') as "smsCapable"
+                                , (Select Nvl(Max(s.dacc_code), '00000') From sku_dacc s
+                                    Where s.prod_name  = l.prod_name
+                                      And s.mfg_code   = l.mfg_code
+                                      And s.effective_date = l.effective_date) as "dacc"
+                                , Nvl(l.device_family_type, ' ')       as "deviceFamilyType"
+                                , Nvl(l.buddy_upgrd_elig_ind, ' ')     as "buddyUpgrdEligInd"
+                                , Nvl(l.restrict_to_family_ind, ' ')   as "restrictToFamilyInd"
+                                , Nvl(f.hd_voice, ' ')                 as "hdVoice"
+                                , Nvl(t.coverage_check_4g, ' ')        as "coverageCheck4G"
+                                , Nvl(t.volte_4_business, ' ')         as "v4b"
+                                , Nvl(t.number_share_capability, ' ')  as "numberShareCapable"
+                                , Nvl(f.euicc_capable, ' ')  as "euiccCapable" --pratik
+                                , Nvl(f.esim_only_ind, ' ')  as "esimOnlyInd" --BQVT-4304
+								, Nvl(f.vendor_key, ' ')  as "vendorKey" --BQVT-4610
+                                , Nvl(f.dsds, ' ') as "dsds"  --BQVT-4693
+                                , Nvl((Select os_type From software s
+                                    Where s.prod_name  = l.prod_name
+                                      And s.mfg_code   = l.mfg_code
+                                      And s.effective_date = l.effective_date), ' ') as "operatingSystem"
+                                , Nvl((Select max(eligible_num_share_os) From DMD_UNIVERSAL_API_DATA api
+                                    Where api.prod_name  = l.prod_name
+                                      And api.mfg_code   = l.mfg_code
+                                      And api.effective_date = l.effective_date), ' ') as "eligibleNumShareOS"
+                                , ( Select decode(count(*), 0, 'N', 'Y')
+                                      From im_eg_accessory ai, launch_package li, im_eg_acc_xref xi
+                                     Where ai.mnfr_id = 0
+                                       And ai.universal_type in (select distinct universal_type from im_eg_accessory)
+                                       And ai.universal_type    <> 'None'
+                                       And li.device_family_name = l.device_family_name
+                                       And xi.equip_id           = li.equip_id
+                                       And xi.acc_id             = ai.acc_id) as "universalDevice"
+                                , Nvl(f.wifi_calling, ' ')        as "wifiCalling"
+                                , Nvl(f.E911_ADDR_IND, ' ')        as "e911AddrInd"
+                                , Case When ie.equip_id Is Null Then
+                                        ' '
+                                  Else Nvl((Select distinct 'N' From im_eg_feat_attr_xref x
+                                        Where x.equip_id = ie.equip_id and x.feature_id  = '1744'), 'Y') End as "cdmaCapableInd"
+                                , Case When d.device_mask like '4G%' Then
+                                       'Y'
+                                       When ie.equip_id Is Null Then
+                                       ' '
+                                  Else Nvl((Select distinct 'Y' From im_eg_feat_attr_xref x
+                                        Where x.equip_id = ie.equip_id and x.feature_id  In ('1773', '915')), 'N') end as "gsmCapableInd"
+										--BQVT-957
+                                , Nvl(l.device_carrier, ' ')        as "deviceCarrier"
+                                , Nvl((select to_char(POSTPAID_RESTRICT_START_DATE,'MM/DD/YYYY') from restrict_devices where device_sku = l.dymax_bam),' ') as "postpaidRestrictStartDate"
+                                , Nvl((select to_char(PREPAY_RESTRICT_START_DATE,'MM/DD/YYYY') from restrict_devices where device_sku = l.dymax_bam),' ') as "prepayRestrictStartDate"
+                                )
+                                , XMLElement("universalPropCdList"
+                                                , (Select XMLAgg(XMLElement("universalPropCd", iv.vzw_model))
+                                                     From ( Select distinct li.device_family_name, ai.vzw_model
+                                                              From im_eg_accessory ai, launch_package li, im_eg_acc_xref xi
+                                                             Where ai.mnfr_id = 0
+                                                               And ai.universal_type    In (select distinct universal_type from im_eg_accessory)
+                                                               And ai.universal_type    <> 'None'
+                                                               And xi.equip_id           = li.equip_id
+                                                               And xi.acc_id             = ai.acc_id) iv
+                                                     Where iv.device_family_name = l.device_family_name))
+                                , XMLElement("deviceSkuList"
+                                                , (Select XMLAgg(
+                                                            XMLElement("deviceSkuInfo"
+                                                                , XMLForest( s.sku_code                    as "deviceSku"
+                                                                           , Nvl(sim_model_id, ' ')        as "virtualSimSku"
+                                                                           , f_get_sku_type(s.sku_code)    as "skuType"
+                                                                           , i.itm_class1                  as "prodCode1"
+                                                                           , i.itm_class2                  as "prodCode2"
+                                                                           , i.itm_class3                  as "prodCode3"
+                                                                           , i.itm_class4                  as "prodCode4"
+                                                                           , i.itm_class5                  as "prodCode5"
+                                                                           , Nvl(i.itm_bta_eligible, ' ')  as "btaEligiblity"
+                                                                           , Nvl(i.itm_upc, ' ')           as "upcCode"
+                                                                           , Nvl(i.itm_prepay_sku, 'N')    as "prepaySkuInd"
+                                                                           , Nvl(i.itm_wave_eligible, ' ') as "edgeEligibleInd"
+                                                                           , Nvl(i.itm_dpc_group, ' ')     as "edgeDpcGroup"
+                                                                           , Nvl(i.itm_dpc_item, ' ')      as "edgeDpcItem"
+                                                                           , i.itm_last_cost               as "itemCost"
+                                                                           , (Select Nvl(to_char(max(i.equip_id)), ' ')
+                                                                                From im_eg_equipment i
+                                                                               Where i.inventory_id  = s.sku_code
+                                                                                 And i.delete_flag   <> 'Y')     as "imEquipID"
+                                                                           , Nvl(i.itm_upc_full, ' ')            as "upcCodeFull"
+                                                                           , i.itm_device_cap                    as "edgeDeviceCap"
+                                                                           , Nvl(i.instant_credit_eligible, ' ') as "instantCredit"
+                                                                           , Nvl(Decode(i.ispu_eligible, 'X', 'Y', i.ispu_eligible), ' ') as "ispuEligible"
+                                                                           , (Select Nvl(REPLACE(REPLACE(max(i.prop65_warning),CHR(10),' '),CHR(13),' '),' ')
+                                                                                  From im_eg_equipment i
+                                                                                  Where i.inventory_id  = s.sku_code
+                                                                                  And i.delete_flag   <> 'Y')  as "prop65"
+                                                                           )))
+                                                     From sku_dacc s, item i, model_product mp, im_eg_equipment e
+                                                    Where s.sku_code       = i.itm_part
+                                                      And mp.model_id(+)   = s.sku_code
+                                                      And s.prod_name      = l.prod_name
+                                                      And s.mfg_code       = l.mfg_code
+                                                      And s.effective_date = l.effective_date
+                                                      AND e.equip_id  = l.equip_id))
+                                , XMLElement("imFeatureNameList"
+                                                 , (Select XMLAgg( XMLElement("imFeatureName", feature_name))
+                                                      From ( Select distinct b.feature_name, a.inventory_id, a.equip_id
+                                                               From im_eg_equipment a, im_eg_feature_attr b, im_eg_feat_attr_xref c
+                                                              Where a.retired       = 'N'
+                                                                And a.active_flag   = 'Y'
+                                                                And a.delete_flag   = 'N'
+                                                                And a.equip_id      = c.equip_id
+                                                                And b.compare_flag  = 'Y'
+                                                                And b.feature_id    = c.feature_id) iv
+                                                     Where iv.equip_id = ie.equip_id ))
+                                , XMLElement("marketingCompatibleSimSkuList"
+                                                 , (Select XMLAgg( XMLElement("simSku", sku_code))
+                                                      From sku_dacc s, device_sim_compatibility dc
+                                                         , (Select prod_name, mfg_code, effective_date, max(dacc_code) dacc_code
+                                                              From sku_dacc
+                                                             Group By prod_name, mfg_code, effective_date) s2
+                                                     Where dc.dacc           = s2.dacc_code
+                                                       And s2.prod_name      = l.prod_name
+                                                       And s2.mfg_code       = l.mfg_code
+                                                       And s2.effective_date = l.effective_date
+                                                       And s.dacc_code       = dc.sacc))
+                              ).getClobVal() deviceInfoList
+              From launch_package l, manufacturer m, equipment_model e, im_eg_equipment ie, features f, (select distinct PROD_MODEL_NAME,MANUFACTURE_NAME from OD_DATA_LOAD) od  --BQVT-1709
+                 , device_mask d, technology t, physical_attributes ph, Table(Cast(l_prod_name_list as string_array)) inp
+             Where (l.display_ind is null Or trim(upper(l.display_ind)) <> 'N' Or l.bcc_ind = 'Y')
+               And l.prod_name          = inp.column_value
+               And m.mfg_code(+)        = l.mfg_code
+               And e.prod_name          = l.prod_name
+               And e.mfg_code           = l.mfg_code
+               And e.effective_date     = l.effective_date
+               And f.prod_name          = l.prod_name
+               And f.mfg_code           = l.mfg_code
+               And f.effective_date     = l.effective_date
+               And f.device_mask_id     = d.device_mask_id(+)
+               And t.prod_name(+)       = l.prod_name
+               And t.mfg_code(+)        = l.mfg_code
+               And t.effective_date(+)  = l.effective_date
+               And ph.prod_name(+)      = l.prod_name
+               And ph.mfg_code(+)       = l.mfg_code
+               And ph.effective_date(+) = l.effective_date
+               And od.prod_model_name(+)= l.prod_name   --BQVT-1709
+               And ie.equip_id(+)       = l.equip_id)
+        Loop
+            If Not p_print_started Then
+                p_print_started := true;
+                l_rec_found     := true;
+                utl_file.put(p_outfile, '<dmd><deviceInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            If Not l_rec_found Then
+                l_rec_found := true;
+                utl_file.put(p_outfile, '<deviceInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            sp_write_clob_2_file(rec.deviceInfoList, p_outfile);
+        End Loop;
+
+        If l_rec_found Then
+            utl_file.put(p_outfile, '</deviceInfoList>');
+            utl_file.new_line(p_outfile);
+            utl_file.fflush(p_outfile);
+        End If;
+
+    End sp_print_device_info;
+
+   Procedure sp_print_sim_info( p_sim_sku       In Varchar2
+                              , p_eff_beg_dt    In Date
+                              , p_print_started In Out Boolean
+                              , p_outfile       In utl_file.file_type) As
+        lc_dest_clob_xml Clob;
+        lc_tmp_clob      Clob;
+        l_rec_found      Boolean;
+        l_prod_name_list string_array;
+        Begin
+
+        If p_sim_sku Is Not Null and length(trim(p_sim_sku)) > 0 Then
+            Select distinct prod_name
+              Bulk Collect Into l_prod_name_list
+              From sku_dacc o
+             Where sku_code = trim(p_sim_sku)
+               And Exists (Select 1 From dmd_universal_api_data d
+                            Where d.prod_name   = o.prod_name
+                              And d.device_mask In ('4GS', '4GK','5GM','5GS'));
+        ElsIf p_eff_beg_dt Is Not Null Then
+            Select distinct prod_name
+              Bulk Collect Into l_prod_name_list
+              From omni_feed_changes o
+             Where last_update_dt >= p_eff_beg_dt
+               -- And Upper(prod_name) Like '%SIM%';
+               And Exists (Select 1 From dmd_universal_api_data d
+                            Where d.prod_name   = o.prod_name
+                              And d.device_mask In ('4GS', '4GK','5GM','5GS'));
+        Else
+            Select distinct prod_name
+              Bulk Collect Into l_prod_name_list
+              From launch_package o
+             Where Exists (Select 1 From dmd_universal_api_data d
+                            Where d.prod_name   = o.prod_name
+                              And d.device_mask In ('4GS', '4GK','5GM','5GS'));
+        End If;
+
+        l_rec_found := false;
+        For rec in (
+            Select XMLElement( "simInfo"
+                     , XMLForest( l.prod_name                                 as "prodName"
+                                , l.mfg_code                                  as "mfgCode"
+--                                , COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name) as "mfgName"     --BQVT-1709 --bqvt-1874
+--                                , '![CDATA['||COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name)||']]'   as "mfgName"     --BQVT-1709 --bqvt-1874
+                                , XMLCDATA(COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name)) as "mfgName"
+                                , Nvl(e.prod_type, ' ')                       as "prodType"
+                                , Nvl(d.device_mask, ' ')                     as "simType"
+                                , (Select Nvl(Max(s.dacc_code), '00000') From sku_dacc s
+                                    Where s.prod_name  = l.prod_name
+                                      And s.mfg_code   = l.mfg_code
+                                      And s.effective_date = l.effective_date) as "sacc"
+                                , Nvl(f.sim_form_factor, ' ')   as "simFormFactor"
+                                , Nvl(f.nfc_capable, ' ')       as "nfcCapable"
+                                , Nvl(f.nfc_compatible, ' ')    as "nfcCompatible")
+                                -- , Nvl(f.nfc_isis_wallet, ' ')   as "nfcIsisWalletCapable")
+                                , XMLElement("simSkuList"
+                                                , (Select XMLAgg(XMLElement("simSku", s.sku_code))
+                                                     From sku_dacc s, item i
+                                                    Where s.sku_code       = i.itm_part
+                                                      And s.prod_name      = l.prod_name
+                                                      And s.mfg_code       = l.mfg_code
+                                                      And s.effective_date = l.effective_date ))
+                              ).getClobVal() simInfo
+              From launch_package l, manufacturer m, equipment_model e, features f, od_data_load od --BQVT-1709
+                 , device_mask d, Table(Cast(l_prod_name_list as string_array)) inp
+             Where (l.display_ind is null or trim(upper(l.display_ind)) <> 'N' Or l.bcc_ind = 'Y')
+               And l.prod_name          = inp.column_value
+               And m.mfg_code(+)        = l.mfg_code
+               And od.prod_model_name(+)= l.prod_name   --BQVT-1709
+               And e.prod_name          = l.prod_name
+               And e.mfg_code           = l.mfg_code
+               And e.effective_date     = l.effective_date
+               And f.prod_name          = l.prod_name
+               And f.mfg_code           = l.mfg_code
+               And f.effective_date     = l.effective_date
+               And f.device_mask_id     = d.device_mask_id(+))
+        Loop
+            If Not p_print_started Then
+                p_print_started := true;
+                l_rec_found     := true;
+                utl_file.put(p_outfile, '<dmd><simInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            If Not l_rec_found Then
+                l_rec_found := true;
+                utl_file.put(p_outfile, '<simInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            sp_write_clob_2_file(rec.simInfo, p_outfile);
+        End Loop;
+
+        If l_rec_found Then
+            utl_file.put(p_outfile, '</simInfoList>');
+            utl_file.new_line(p_outfile);
+            utl_file.fflush(p_outfile);
+        End If;
+
+    End sp_print_sim_info;
+
+   Procedure sp_print_acc_info( p_eff_beg_dt    In Date
+                              , p_print_started In Out Boolean
+                              , p_outfile       In utl_file.file_type) As
+        lc_dest_clob_xml Clob;
+        lc_tmp_clob      Clob;
+        l_rec_found      Boolean;
+        l_acc_sku_list string_array;
+        Begin
+
+        If p_eff_beg_dt Is Not Null Then
+            Select distinct acc_sku
+              Bulk Collect Into l_acc_sku_list
+              From ( Select distinct vzw_model as acc_sku
+                       From im_eg_accessory
+                      Where update_date >= p_eff_beg_dt
+                         Or create_date >= p_eff_beg_dt
+                     Union
+                     Select distinct itm_part as acc_sku
+                       From item
+                      Where itm_class1            = 'ACC'
+                        And Nvl(itm_class4, 'D') <> 'DSB'
+                        And itm_date_add         >= p_eff_beg_dt
+                     Union
+                     Select distinct itm_part
+                       From ( Select itm_part, itm_description, itm_bta_eligible, itm_upc, itm_upc_full
+                                   , itm_class1, itm_class2, itm_class3, itm_class4, itm_class5, ispu_eligible
+                                From item i
+                               Where itm_class1 = 'ACC'
+                                 And Nvl(itm_class4, 'D') <> 'DSB'
+                               Minus
+                              Select itm_part, itm_description, itm_bta_eligible, itm_upc, itm_upc_full
+                                   , itm_class1, itm_class2, itm_class3, itm_class4, itm_class5, ispu_eligible
+                                From item_bkp i));
+        Else
+            Select distinct acc_sku
+              Bulk Collect Into l_acc_sku_list
+              From ( Select distinct vzw_model as acc_sku
+                       From im_eg_accessory
+                     Union
+                     Select distinct itm_part as acc_sku
+                       From Item
+                      Where itm_class1              = 'ACC'
+                        And Nvl(itm_class4, 'D')   <> 'DSB');
+        End If;
+
+        l_rec_found := false;
+        For rec in ( Select XMLElement("accessoryInfo"
+                             , XMLForest( i.itm_part                                as "accessorySku"
+--                                        , Nvl(m.mnfr_name, ' ')                     as "imManufacturer"
+--                                        , '![CDATA['||Nvl(m.mnfr_name, ' ')||']]'   as "imManufacturer"
+                                        , XMLCDATA(Nvl(m.mnfr_name, ' ')) as "imManufacturer"
+                                        , Nvl(a.mktg_name, i.itm_description)       as "imAccessoryMktgName"
+                                        , Nvl(a.description, i.itm_description)     as "imAccessoryDesc"
+                                        , Nvl(ap.type_name, ' ')                    as "accessoryType"
+                                        , Nvl(to_char(ap.type_id), ' ')             as "accessoryTypeId"
+                                        , Nvl(a.image_location, ' ')                as "imImageUrl"
+                                        , i.itm_class1                              as "prodCode1"
+                                        , i.itm_class2                              as "prodCode2"
+                                        , i.itm_class3                              as "prodCode3"
+                                        , i.itm_class4                              as "prodCode4"
+                                        , i.itm_class5                              as "prodCode5"
+                                        , Nvl(i.itm_bta_eligible, ' ')              as "btaEligiblity"
+                                        , Nvl(i.itm_upc, ' ')                       as "upcCode"
+                                        , Decode( a.universal_type
+                                                , Null, 'N', 'None', 'N'
+                                                , 'Y')                              as "universalAcc"
+                                        , Nvl(i.itm_upc_full, ' ')                  as "upcCodeFull"
+                                        --, Nvl(i.ispu_eligible, ' ')                 as "ispuEligible")
+                                        , Nvl(Decode(i.ispu_eligible, 'X', 'Y', i.ispu_eligible), ' ') as "ispuEligible"
+                                        ,(Select Nvl(REPLACE(REPLACE(max(ac.prop65_warning),CHR(10),' '),CHR(13),' '),' ')
+                                         from im_eg_accessory ac where
+                                         i.itm_part     = ac.vzw_model(+)
+                                         )as "prop65",
+                                         i.itm_dpc_group as "edgeDpcGroup",
+                                         i.itm_dpc_item as "edgeDpc"
+                                        )
+                                        , XMLElement("universalPropCdList"
+                                                        , (Select XMLAgg(XMLElement("universalPropCd", iv.vzw_model))
+                                                             From ( Select distinct ai.vzw_model, ai.universal_type
+                                                                      From im_eg_accessory ai
+                                                                     Where ai.mnfr_id = 0
+                                                                       And ai.universal_type    In (select distinct universal_type from im_eg_accessory)
+                                                                       And ai.universal_type    <> 'None') iv
+                                                             Where iv.universal_type = a.universal_type)))
+                                              .getClobVal() as accessoryInfo
+              From im_eg_accessory a, im_eg_manufacturer m, im_eg_acc_type ap, item i
+                 , Table(Cast(l_acc_sku_list as string_array)) inp
+             Where i.itm_part     = inp.column_value
+               And m.mnfr_id(+)   = a.mnfr_id
+               And i.itm_part     = a.vzw_model(+)
+               And ap.type_id(+)  = a.acc_type
+               And Nvl(a.dnh_acc, 'N')     <> 'Y'
+               And Nvl(a.delete_flag, 'N') <> 'Y'
+               And Nvl(i.itm_class4, 'D')  <> 'DSB')
+        Loop
+            If Not p_print_started Then
+                p_print_started := true;
+                l_rec_found     := true;
+                utl_file.put(p_outfile, '<dmd><accessoryInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            If Not l_rec_found Then
+                l_rec_found := true;
+                utl_file.put(p_outfile, '<accessoryInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            sp_write_clob_2_file(rec.accessoryInfo, p_outfile);
+        End Loop;
+
+        If l_rec_found Then
+            utl_file.put(p_outfile, '</accessoryInfoList>');
+            utl_file.new_line(p_outfile);
+            utl_file.fflush(p_outfile);
+        End If;
+
+    End sp_print_acc_info;
+
+   Procedure sp_print_soft_sku_info( p_eff_beg_dt    In Date
+                                   , p_print_started In Out Boolean
+                                   , p_outfile       In utl_file.file_type) As
+        lc_dest_clob_xml Clob;
+        lc_tmp_clob      Clob;
+        l_rec_found      Boolean;
+        l_soft_sku_list string_array;
+        Begin
+
+        If p_eff_beg_dt Is Not Null Then
+              Select distinct itm_part as acc_sku
+                Bulk Collect Into l_soft_sku_list
+                From (
+                    Select itm_part
+                      From item
+                     Where itm_class1    In ('PPP', 'ACT', 'ADJ', 'LAB', 'LCS', 'WRP', 'WPP', 'TAX', 'WAR', 'CRD', 'SEC', 'FUL', 'CRF', 'NIN', 'QAC','SVC')
+                       And itm_date_add  >= p_eff_beg_dt
+                    Union
+                    Select distinct itm_part
+                       From ( Select itm_part, itm_description, i.itm_short_desc, itm_type
+                                   , itm_class1, itm_class2, itm_class3, itm_class4, itm_class5
+                                From item i
+                               Where itm_class1    In ('PPP', 'ACT', 'ADJ', 'LAB', 'LCS', 'WRP', 'WPP', 'TAX', 'WAR', 'CRD', 'SEC', 'FUL', 'CRF', 'NIN', 'QAC','SVC')
+                               Minus
+                              Select itm_part, itm_description, i.itm_short_desc, itm_type
+                                   , itm_class1, itm_class2, itm_class3, itm_class4, itm_class5
+                                From item_bkp i
+                               Where itm_class1    In ('PPP', 'ACT', 'ADJ', 'LAB', 'LCS', 'WRP', 'WPP', 'TAX', 'WAR', 'CRD', 'SEC', 'FUL', 'CRF', 'NIN', 'QAC','SVC')));
+        Else
+              Select distinct itm_part as acc_sku
+                Bulk Collect Into l_soft_sku_list
+                From item
+               Where itm_class1 In ('PPP', 'ACT', 'ADJ', 'LAB', 'LCS', 'WRP', 'WPP', 'TAX', 'WAR', 'CRD', 'SEC', 'FUL', 'CRF', 'NIN', 'QAC','SVC');
+        End If;
+
+        l_rec_found := false;
+        For rec in ( Select XMLElement("softSkuInfo"
+                             , XMLForest( i.itm_part            as "softSku"
+                                        , i.itm_description     as "softSkuDesc"
+                                        , i.itm_short_desc      as "softSkuShortDesc"
+                                        , i.itm_type            as "skuType"
+                                        , i.itm_class1          as "prodCode1"
+                                        , i.itm_class2          as "prodCode2"
+                                        , i.itm_class3          as "prodCode3"
+                                        , i.itm_class4          as "prodCode4"
+                                        , i.itm_class5          as "prodCode5"))
+                                              .getClobVal() as softSkuInfo
+              From item i
+                 , Table(Cast(l_soft_sku_list as string_array)) inp
+             Where i.itm_part     = inp.column_value)
+        Loop
+            If Not p_print_started Then
+                p_print_started := true;
+                l_rec_found     := true;
+                utl_file.put(p_outfile, '<dmd><softSkuInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            If Not l_rec_found Then
+                l_rec_found := true;
+                utl_file.put(p_outfile, '<softSkuInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            sp_write_clob_2_file(rec.softSkuInfo, p_outfile);
+        End Loop;
+
+        If l_rec_found Then
+            utl_file.put(p_outfile, '</softSkuInfoList>');
+            utl_file.new_line(p_outfile);
+            utl_file.fflush(p_outfile);
+        End If;
+
+    End sp_print_soft_sku_info;
+
+   Procedure sp_print_dev_acc_comp( p_device_sku     In Varchar2
+                                  , p_eff_beg_dt     In Date
+                                  , p_print_started  In Out Boolean
+                                  , p_outfile        In utl_file.file_type
+                                  , p_drop_ship_only In Varchar2) As
+        lc_dest_clob_xml Clob;
+        lc_tmp_clob      Clob;
+        l_rec_found      Boolean;
+        l_dev_fam_list   string_array;
+        l_fam_full_list  string_array;
+   Begin
+        If p_eff_beg_dt Is Not Null Then
+            For rec in (Select distinct acc_sku
+                          From omni_feed_changes
+                         Where last_update_dt >= p_eff_beg_dt
+                           And prod_name       = 'ACC_SKU'
+                           And acc_sku        Is Not Null)
+            Loop
+                sp_comp_sync_by_acc(rec.acc_sku);
+            End Loop;
+        End If;
+
+        For rec in (Select itm_part From item where itm_class1 = 'ACC'
+                    Minus
+                    Select itm_part From item_bkp where itm_class1 = 'ACC')
+        Loop
+            sp_comp_sync_by_acc(rec.itm_part);
+        End Loop;
+
+        If p_device_sku Is Not Null Then
+            Select Distinct l.device_family_name
+              Bulk Collect Into l_dev_fam_list
+              From launch_package l, model_product mp
+             Where mp.model_id       = p_device_sku
+               And mp.prod_name      = l.prod_name
+               And mp.mfg_code       = l.mfg_code
+               And mp.effective_date = l.effective_date;
+
+             If p_eff_beg_dt Is Null Then
+                l_fam_full_list := l_dev_fam_list;
+                l_dev_fam_list  := Null;
+             End If;
+        ElsIf p_eff_beg_dt Is Not Null Then
+            Select Distinct l.device_family_name
+              Bulk Collect Into l_dev_fam_list
+              From im_eg_acc_xref_hist x, launch_package l, im_eg_accessory a
+             Where x.equip_id           = l.equip_id
+               And x.create_dt         >= p_eff_beg_dt
+               And x.acc_id             = a.acc_id
+               And Nvl(a.dnh_acc, 'N')  = Nvl(p_drop_ship_only, 'N');
+        Else
+            Select Distinct l.device_family_name
+              Bulk Collect Into l_fam_full_list
+              From launch_package l;
+        End If;
+
+        l_rec_found := false;
+        For rec in ( Select XMLElement("deviceFamilyInfo"
+                                , XMLElement("familyName", family_name)
+                                , XMLElement("imAccessoryList", save_ele, remove_ele)).getClobVal() as deviceFamilyInfo
+                       From ( Select inp.column_value family_name
+                                 , XMLElement("save"
+                                        , ( Select XMLAgg( XMLElement("accSku", vzw_model))
+                                              From ( Select distinct l.device_family_name, a.vzw_model
+                                                       From launch_package l, im_eg_acc_xref_hist x, item i, im_eg_accessory a
+                                                      Where a.acc_id             = x.acc_id
+                                                        And a.delete_flag       <> 'Y'
+                                                        And l.equip_id           = x.equip_id
+                                                        And x.action             = 'I'
+                                                        And i.itm_part           = a.vzw_model
+                                                        And x.create_dt         >= p_eff_beg_dt
+                                                        And Nvl(a.dnh_acc, 'N')  = Nvl(p_drop_ship_only, 'N')
+														And Not Exists (Select 1 from mv_atg_acc_comp_check
+														                 Where sor_display_name = l.device_family_name
+																		   And accessory_sor_id = a.vzw_model)
+                                                        And Exists ( Select 'Yes' From im_eg_acc_xref ox
+                                                                      Where ox.acc_id   = x.acc_id
+                                                                        And ox.equip_id = x.equip_id))
+                                             Where device_family_name = inp.column_value)) as save_ele
+                                 , XMLElement("remove"
+                                        , ( Select XMLAgg( XMLElement("accSku", vzw_model))
+                                              From ( Select distinct l.device_family_name, a.vzw_model
+                                                       From launch_package l, im_eg_acc_xref_hist x, item i, im_eg_accessory a
+                                                      Where a.acc_id             = x.acc_id
+                                                        And l.equip_id           = x.equip_id
+                                                        And x.action             = 'D'
+                                                        And i.itm_part           = a.vzw_model
+                                                        And x.create_dt         >= p_eff_beg_dt
+                                                        And Nvl(a.dnh_acc, 'N')  = Nvl(p_drop_ship_only, 'N')
+                                                        And Not Exists ( Select 'No' From im_eg_acc_xref ox, launch_package li, im_eg_accessory ai
+                                                                          Where ai.vzw_model          = a.vzw_model
+                                                                            And ai.delete_flag       <> 'Y'
+                                                                            And li.device_family_name = l.device_family_name
+                                                                            And ox.acc_id             = ai.acc_id
+                                                                            And ox.equip_id           = li.equip_id))
+                                             Where device_family_name = inp.column_value)) as remove_ele
+                              From Table(Cast(l_dev_fam_list as string_array)) inp ))
+        Loop
+            If Not p_print_started Then
+                p_print_started := true;
+                l_rec_found     := true;
+                utl_file.put(p_outfile, '<dmd><deviceFamilyInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            If Not l_rec_found Then
+                l_rec_found := true;
+                utl_file.put(p_outfile, '<deviceFamilyInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            sp_write_clob_2_file(rec.deviceFamilyInfo, p_outfile);
+        End Loop;
+
+        For rec in ( Select XMLElement("deviceFamilyInfo"
+                                , XMLElement("familyName", family_name)
+                                , XMLElement("imAccessoryList", save_ele)).getClobVal() as deviceFamilyInfo
+                       From ( Select inp.column_value family_name
+                                 , XMLElement("save"
+                                        , ( Select XMLAgg( XMLElement("accSku", vzw_model))
+                                              From ( Select distinct l.device_family_name, a.vzw_model
+                                                       From launch_package l, im_eg_acc_xref x, item i, im_eg_accessory a
+                                                      Where a.acc_id             = x.acc_id
+                                                        And l.equip_id           = x.equip_id
+                                                        And i.itm_part           = a.vzw_model)
+                                             Where device_family_name = inp.column_value)) as save_ele
+                              From Table(Cast(l_fam_full_list as string_array)) inp ))
+        Loop
+            If Not p_print_started Then
+                p_print_started := true;
+                l_rec_found     := true;
+                utl_file.put(p_outfile, '<dmd><deviceFamilyInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            If Not l_rec_found Then
+                l_rec_found := true;
+                utl_file.put(p_outfile, '<deviceFamilyInfoList>');
+                utl_file.new_line(p_outfile);
+                utl_file.fflush(p_outfile);
+            End If;
+
+            sp_write_clob_2_file(rec.deviceFamilyInfo, p_outfile);
+        End Loop;
+
+        If l_rec_found Then
+            utl_file.put(p_outfile, '</deviceFamilyInfoList>');
+            utl_file.new_line(p_outfile);
+            utl_file.fflush(p_outfile);
+        End If;
+
+        g_rec_found := l_rec_found;
+    End sp_print_dev_acc_comp;
+
+   Procedure sp_sync_bcc_acc_comp( p_device_family_name In Varchar2) As
+   Begin
+
+    -- Add missing pair to the feed
+    Insert Into im_eg_acc_xref_hist(equip_id, acc_id, action, create_dt)
+        Select l.equip_id, a.acc_id, 'I', sysdate
+          From ( Select distinct l.device_family_name, a.vzw_model
+                   From launch_package l, im_eg_acc_xref x, item i, im_eg_accessory a
+                  Where a.acc_id       = x.acc_id
+                    And a.delete_flag <> 'Y'
+                    And l.equip_id     = x.equip_id
+                    And i.itm_part     = a.vzw_model
+                    And l.device_family_name = Nvl(p_device_family_name, l.device_family_name)
+                 Minus
+                 Select sor_display_name, accessory_sor_id From mv_atg_acc_comp_check) v
+             , launch_package l, im_eg_accessory a
+         Where l.device_family_name = v.device_family_name
+           And a.vzw_model          = v.vzw_model;
+    Commit;
+
+    -- Remove incorrect pair to the feed
+    Insert Into im_eg_acc_xref_hist(equip_id, acc_id, action, create_dt)
+        Select l.equip_id, a.acc_id, 'D', sysdate
+          From ( Select sor_display_name device_family_name, accessory_sor_id vzw_model
+                   From mv_atg_acc_comp_check
+                  Where sor_display_name = Nvl(p_device_family_name, sor_display_name)
+                 Minus
+                 Select distinct l.device_family_name, a.vzw_model
+                   From launch_package l, im_eg_acc_xref x, item i, im_eg_accessory a
+                  Where a.acc_id       = x.acc_id
+                    And a.delete_flag <> 'Y'
+                    And l.equip_id     = x.equip_id
+                    And i.itm_part     = a.vzw_model) v
+             , launch_package l, im_eg_accessory a
+         Where l.device_family_name = v.device_family_name
+           And a.vzw_model          = v.vzw_model;
+    Commit;
+   End sp_sync_bcc_acc_comp;
+
+   Procedure sp_comp_sync_by_acc( p_acc_sku In Varchar2) As
+   Begin
+    -- Add missing pair to the feed
+    Insert Into im_eg_acc_xref_hist(equip_id, acc_id, action, create_dt)
+    Select distinct l.equip_id, a.acc_id, 'I', sysdate
+      From launch_package l, im_eg_acc_xref x, item i, im_eg_accessory a
+     Where a.acc_id    = x.acc_id
+       And l.equip_id  = x.equip_id
+       And i.itm_part  = a.vzw_model
+       And a.vzw_model = p_acc_sku
+       And Not Exists ( Select 1 From mv_atg_acc_comp_check m
+                         Where sor_display_name = device_family_name
+                           And accessory_sor_id = vzw_model);
+    Commit;
+
+    -- Remove incorrect pair to the feed
+    Insert Into im_eg_acc_xref_hist(equip_id, acc_id, action, create_dt)
+    Select distinct l.equip_id, a.acc_id, 'D', sysdate
+      From launch_package l, im_eg_accessory a, mv_atg_acc_comp_check m
+     Where m.accessory_sor_id   = p_acc_sku
+       And a.vzw_model          = m.accessory_sor_id
+       And l.device_family_name = m.sor_display_name
+       And l.equip_id          Is Not Null
+       And Not Exists (Select 1 From im_eg_acc_xref x
+                        Where x.equip_id = l.equip_id
+                          And x.acc_id   = a.acc_id);
+    Commit;
+   End sp_comp_sync_by_acc;
+
+   Procedure sp_create_omni_feed_file( p_device_sku   In Varchar2
+                                     , p_delta_only   In Varchar2
+                                     , p_eff_beg_dt   In Date
+                                     , p_email_notif  In Varchar2) As
+        lc_dest_clob_xml Clob;
+        lc_tmp_clob      Clob;
+        l_outfile        utl_file.file_type;
+        l_file_started   boolean := false;
+        ls_file_name     Varchar2(50);
+        ls_err_msg       Varchar2(4000);
+        ls_feed_params   Varchar2(256);
+        Begin
+
+        Delete From im_eg_acc_xref_hist o Where create_dt < (sysdate - 30); -- Clean up history
+        Commit;
+
+        ls_file_name := 'DMD_FEED_'||to_char(sysdate, 'YYYYMMDD-HH24MISS')||'.xml';
+        l_outfile := utl_file.fopen( 'CASS_DATA_OUT', ls_file_name, 'w', max_linesize => 32767);
+
+        l_file_started := false;
+        sp_print_device_info( p_device_sku, p_eff_beg_dt, l_file_started, l_outfile);
+        If p_device_sku Is Null Or length(trim(p_device_sku)) < 1 Then
+            sp_print_acc_info( p_eff_beg_dt, l_file_started, l_outfile);
+        End If;
+        sp_print_sim_info( p_device_sku, p_eff_beg_dt, l_file_started, l_outfile);
+        If p_device_sku Is Null Or length(trim(p_device_sku)) < 1 Then
+            sp_print_soft_sku_info( p_eff_beg_dt, l_file_started, l_outfile);
+        End If;
+        sp_print_dev_acc_comp( p_device_sku, p_eff_beg_dt, l_file_started, l_outfile, 'N');
+
+        If l_file_started Then
+            utl_file.put(l_outfile, '</dmd>');
+        Else
+            utl_file.put(l_outfile, '<dmd></dmd>');
+        End If;
+
+        utl_file.new_line(l_outfile);
+        utl_file.fflush(l_outfile);
+        utl_file.fclose( l_outfile );
+        g_feed_gen_succ := true;
+
+        If p_email_notif is not null and length(trim(p_email_notif)) > 3 Then
+            VZW_SEND_EMAIL( 'POS_DMD_' || user, trim(p_email_notif),'DMD Process for OMNI Feed is completed successfully'
+                          , 'DMD process for OMNI Feed is completed successfully.
+Received params:
+deltaOnly = ' || p_delta_only || '
+deviceSku = ' || p_device_sku || '
+effFeedTS = ' || to_char(p_eff_beg_dt, 'DD-MON-YYYY HH24:MI:SS') || '
+
+Generated File Name : ' || ls_file_name || '
+Generated Time : ' || to_char(sysdate, 'DD-MON-YYYY HH24:MI:SS') || '
+
+Regards,
+DMD Admin Team.
+');
+
+        End If;
+
+        If p_device_sku Is Null And p_eff_beg_dt Is Null Then
+            ls_feed_params := 'Full Feed';
+        ElsIf p_device_sku Is Not Null And p_eff_beg_dt Is Not Null Then
+            ls_feed_params := 'Delta,' || p_device_sku || ',' || to_char(p_eff_beg_dt, 'YYYYMMDD-HH24MISS');
+        ElsIf p_device_sku Is Not Null Then
+            ls_feed_params := 'Delta,' || p_device_sku;
+        Else
+            ls_feed_params := 'Delta,' || to_char(p_eff_beg_dt, 'YYYYMMDD-HH24MISS');
+        End If;
+
+        Insert Into vzw_feed_file_monitor_new(feed_type, feed_name, feed_created_timestamp, feed_creation_parameters)
+        Values('DMD', ls_file_name, sysdate, ls_feed_params);
+        Commit;
+
+    Exception
+        When Others Then
+            ls_err_msg := sqlerrm || CHR(13) || dbms_utility.format_error_backtrace;
+            VZW_SEND_EMAIL( 'POS_DMD_' || user, Nvl(trim(p_email_notif), 'VZWITBCCSpprt@vzwcorp.com'),'DMD Process for OMNI Feed FAILED'
+                          , 'DMD Feed generation Process for OMNI FAILED with following error message:
+' || ls_err_msg || '.
+
+Input params Received:
+deltaOnly = ' || p_delta_only || '
+deviceSku = ' || p_device_sku || '
+effFeedTS = ' || to_char(p_eff_beg_dt, 'DD-MON-YYYY HH24:MI:SS') || '
+
+Generated File Name : ' || ls_file_name || '
+Generated Time : ' || to_char(sysdate, 'DD-MON-YYYY HH24:MI:SS') || '
+
+Regards,
+DMD Admin Team.
+');
+    End sp_create_omni_feed_file;
+
+   Procedure sp_create_dship_omni_feed_file( p_device_sku   In Varchar2
+                                           , p_eff_beg_dt   In Date
+                                           , p_email_notif  In Varchar2) As
+        lc_dest_clob_xml Clob;
+        lc_tmp_clob      Clob;
+        l_outfile        utl_file.file_type;
+        l_file_started   boolean := false;
+        ls_file_name     Varchar2(50);
+        ls_err_msg       Varchar2(4000);
+        Begin
+
+        ls_file_name := 'DS_Compatibility_'||to_char(sysdate, 'YYYYMMDD-HH24MISS')||'.xml';
+        l_outfile := utl_file.fopen( 'OMNI_FEED_DIR', ls_file_name, 'w', max_linesize => 32767);
+
+        g_rec_found := false;
+        l_file_started := true;
+        sp_print_dev_acc_comp( p_device_sku, p_eff_beg_dt, l_file_started, l_outfile, 'Y');
+
+        If Not g_rec_found Then
+            utl_file.put(l_outfile, '<deviceFamilyInfoList></deviceFamilyInfoList>');
+            utl_file.new_line(l_outfile);
+            utl_file.fflush(l_outfile);
+        End If;
+
+        utl_file.fclose( l_outfile );
+
+        If p_email_notif is not null and length(trim(p_email_notif)) > 3 Then
+            VZW_SEND_EMAIL( 'POS_DMD_' || user, trim(p_email_notif),'DMD Process for OMNI Drop Ship Feed is completed successfully'
+                          , 'DMD process for OMNI Drop Ship Feed is completed successfully.
+Received params:
+deviceSku = ' || p_device_sku || '
+effFeedTS = ' || to_char(p_eff_beg_dt, 'DD-MON-YYYY HH24:MI:SS') || '
+
+Generated File Name : ' || ls_file_name || '
+Generated Time : ' || to_char(sysdate, 'DD-MON-YYYY HH24:MI:SS') || '
+
+Regards,
+DMD Admin Team.
+');
+
+        End If;
+    Exception
+        When Others Then
+            ls_err_msg := sqlerrm || CHR(13) || dbms_utility.format_error_backtrace;
+            VZW_SEND_EMAIL( 'POS_DMD_' || user, Nvl(trim(p_email_notif), 'VZWITBCCSpprt@vzwcorp.com'),'DMD Process for OMNI Feed FAILED'
+                          , 'DMD Feed generation Process for OMNI DNH Accessory FAILED with following error message:
+' || ls_err_msg || '.
+
+Input params Received:
+deviceSku = ' || p_device_sku || '
+effFeedTS = ' || to_char(p_eff_beg_dt, 'DD-MON-YYYY HH24:MI:SS') || '
+
+Generated File Name : ' || ls_file_name || '
+Generated Time : ' || to_char(sysdate, 'DD-MON-YYYY HH24:MI:SS') || '
+
+Regards,
+DMD Admin Team.
+');
+    End sp_create_dship_omni_feed_file;
+
+   Procedure sp_for_batch_job( p_eff_beg_dt   In Date
+                             , p_email_notif  In Varchar2) As
+   Begin
+        Execute Immediate 'TRUNCATE TABLE ITEM_TMP_BKP';
+        Insert Into ITEM_TMP_BKP( ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+                                , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+                                , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+                                , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE)
+                           Select ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+                                , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+                                , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+                                , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE
+                             From ITEM;
+        COMMIT;
+
+        g_feed_gen_succ := false;
+        sp_create_omni_feed_file( Null, 'Y', p_eff_beg_dt, p_email_notif);
+
+        If g_feed_gen_succ Then
+            Execute Immediate 'TRUNCATE TABLE ITEM_BKP';
+            Insert Into ITEM_BKP( ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+                                , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+                                , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+                                , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE)
+                           Select ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+                                , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+                                , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+                                , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE
+                             From ITEM_TMP_BKP;
+            COMMIT;
+        End If;
+   End sp_for_batch_job;
+
+   Procedure sp_get_sim_info( p_sim_sku_list     In Varchar2
+                              , p_eff_beg_dt    In Date
+                              , p_result_set      Out Sys_RefCursor) As
+
+         l_prod_name_list string_array;
+       Begin
+         If p_sim_sku_list Is Not Null and length(trim(p_sim_sku_list)) > 0 Then
+            Select distinct prod_name
+              Bulk Collect Into l_prod_name_list
+              From sku_dacc o
+                where ',' || trim(p_sim_sku_list) || ',' like '%,' || o.sku_code || ',%'
+               And Exists (Select 1 From dmd_universal_api_data d
+                                Where d.device_sku   = o.sku_code
+                                  And d.device_mask In ('4GS', '4GK','5GM','5GS'));
+            ElsIf p_eff_beg_dt Is Not Null Then
+            Select distinct prod_name
+              Bulk Collect Into l_prod_name_list
+              From omni_feed_changes o
+             Where last_update_dt >= p_eff_beg_dt
+               And Exists (Select 1 From dmd_universal_api_data d
+                            Where d.prod_name   = o.prod_name
+                              And d.device_mask In ('4GS', '4GK','5GM','5GS'));
+             End if;
+
+          Open p_result_set For
+                 Select XMLElement( "simInfo"
+                     , XMLForest( l.prod_name                                 as "prodName"
+                                , l.mfg_code                                  as "mfgCode"
+--                                , COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name) as "mfgName"     --BQVT-1709  --bqvt-1874
+--                                , '![CDATA['||COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name)||']]'   as "mfgName"     --BQVT-1709 --bqvt-1874
+                                , XMLCDATA(COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name))  as "mfgName"     --BQVT-1709 --bqvt-1874
+                                , Nvl(e.prod_type, ' ')                       as "prodType"
+                                , Nvl(d.device_mask, ' ')                     as "simType"
+                                , (Select Nvl(Max(s.dacc_code), '00000') From sku_dacc s
+                                    Where s.prod_name  = l.prod_name
+                                      And s.mfg_code   = l.mfg_code
+                                      And s.effective_date = l.effective_date) as "sacc"
+                                , Nvl(f.sim_form_factor, ' ')   as "simFormFactor"
+                                , Nvl(f.nfc_capable, ' ')       as "nfcCapable"
+                                , Nvl(f.nfc_compatible, ' ')    as "nfcCompatible")
+                                , XMLElement("simSkuList"
+                                                , (Select XMLAgg(XMLElement("simSku", s.sku_code))
+                                                     From sku_dacc s, item i
+                                                    Where s.sku_code       = i.itm_part
+                                                      And s.prod_name      = l.prod_name
+                                                      And s.mfg_code       = l.mfg_code
+                                                      And s.effective_date = l.effective_date ))
+                              ).getClobVal() simInfoList
+              From launch_package l, manufacturer m, equipment_model e, features f, od_data_load od --BQVT-1709
+                 , device_mask d, Table(Cast(l_prod_name_list as string_array)) inp
+             Where (l.display_ind is null or trim(upper(l.display_ind)) <> 'N' Or l.bcc_ind = 'Y')
+               And l.prod_name          = inp.column_value
+               And m.mfg_code(+)        = l.mfg_code
+               And od.prod_model_name(+)= l.prod_name   --BQVT-1709
+               And e.prod_name          = l.prod_name
+               And e.mfg_code           = l.mfg_code
+               And e.effective_date     = l.effective_date
+               And f.prod_name          = l.prod_name
+               And f.mfg_code           = l.mfg_code
+               And f.effective_date     = l.effective_date
+               And f.device_mask_id     = d.device_mask_id(+);
+   End sp_get_sim_info;
+
+    Procedure sp_get_dev_info( p_device_sku_list   In Varchar2
+                            , p_eff_beg_dt         In Date
+                            , p_result_set       Out Sys_RefCursor) As
+
+      l_prod_name_list string_array;
+
+        Begin
+        If p_device_sku_list Is Not Null and length(trim(p_device_sku_list)) > 0 Then
+            Select distinct prod_name
+              Bulk Collect Into l_prod_name_list
+              From sku_dacc o
+                where ',' || trim(p_device_sku_list) || ',' like '%,' || o.sku_code || ',%'
+               And Not Exists (Select 1 From dmd_universal_api_data d
+                                Where d.device_sku   = o.sku_code
+                                  And d.device_mask In ('4GS', '4GK','5GM','5GS'));
+        ElsIf p_eff_beg_dt Is Not Null Then
+            Select distinct prod_name
+              Bulk Collect Into l_prod_name_list
+              From omni_feed_changes o
+             Where last_update_dt >= p_eff_beg_dt
+               And Not Exists (Select 1 From dmd_universal_api_data d
+                                Where d.prod_name   = o.prod_name
+                                  And d.device_mask In ('4GS', '4GK','5GM','5GS'))
+              Union
+            Select distinct mp.prod_name
+              From model_product mp, ( Select i.itm_part, i.itm_class1, i.itm_class2, i.itm_class3, i.itm_class4, i.itm_class5
+                                            , i.itm_bta_eligible, i.itm_upc, i.itm_prepay_sku, i.itm_wave_eligible, i.itm_dpc_group
+                                            , i.itm_dpc_item, i.itm_last_cost, i.itm_upc_full, i.itm_device_cap, i.instant_credit_eligible
+                                            , i.ispu_eligible
+                                         From item i
+                                        Minus
+                                       Select i.itm_part, i.itm_class1, i.itm_class2, i.itm_class3, i.itm_class4, i.itm_class5
+                                            , i.itm_bta_eligible, i.itm_upc, i.itm_prepay_sku, i.itm_wave_eligible, i.itm_dpc_group
+                                            , i.itm_dpc_item, i.itm_last_cost, i.itm_upc_full, i.itm_device_cap, i.instant_credit_eligible
+                                            , i.ispu_eligible
+                                         From item_bkp i) i
+            Where mp.model_id  = itm_part
+              -- And Upper(mp.prod_name) Not Like '%SIM%';
+              And Not Exists (Select 1 From dmd_universal_api_data d
+                               Where d.device_sku   = mp.model_id
+                                 And d.device_mask In ('4GS', '4GK','5GM','5GS'));
+         End If ;
+        Open p_result_set 	For
+    Select XMLElement( "deviceInfo"
+                       , XMLForest( l.prod_name as "prodName"
+                                , l.device_family_name                        as "familyName"
+                                , l.mfg_code                                  as "mfgCode"
+--                                , COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name) as "mfgName"     --BQVT-1709 --bqvt-1874
+--                                , '![CDATA['||COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name)||']]'   as "mfgName"     --BQVT-1709 --bqvt-1874
+                                ,XMLCDATA(COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name)) as "mfgName"
+                                , Nvl(e.prod_type, ' ')                       as "prodType"
+                                , Nvl(ie.equip_name, ' ')                     as "imProdName"
+                                , Nvl(ie.main_image, ' ')                     as "imImageUrl"
+                                , Nvl(ie.Device_Category, ' ')                as "imDeviceCategory"
+                                , Nvl(d.device_mask, ' ')                     as "deviceType"
+                                , Nvl(f.global_phone, ' ')                    as "globalPhone"
+                                , Nvl(l.device_category, ' ')                 as "deviceCategory"
+                                , Nvl(t.dcat, ' ')                            as "deviceCapabilityInd"
+                                , Nvl(f.ba, ' ')                              as "backupAssistCapable"
+                                , ( Select nvl(max(sc.sim_sku), ' ')
+                                      from sim_4g_compatible_marketing sc
+                                     Where sc.preferred_sim  = 'Y'
+                                       And sc.prod_name      = l.prod_name
+                                       And sc.mfg_code       = l.mfg_code
+                                       And sc.effective_date = l.effective_date) as "preferredSim"
+                                ,( Select nvl(max(sc.sim_sku), ' ')
+                                      from sim_4g_compatible_marketing sc
+                                     Where sc.preferred_soft_sim  = 'Y'
+                                       And sc.prod_name      = l.prod_name
+                                       And sc.mfg_code       = l.mfg_code
+                                       And sc.effective_date = l.effective_date) as "preferredSoftSim",
+                                       ( Select nvl(max(sc.sim_sku), ' ')
+                                      from sim_4g_compatible_marketing sc
+                                     Where sc.alternate_sim  = 'Y'
+                                       And sc.prod_name      = l.prod_name
+                                       And sc.mfg_code       = l.mfg_code
+                                       And sc.effective_date = l.effective_date) as "alternateSim"
+                                , Nvl(ph.sim_class_4g, ' ')     as "simClass4G"
+                                , Nvl(f.nfc_capable, ' ')       as "nfcCapable"
+                                , Nvl(f.nfc_compatible, ' ')    as "nfcCompatible"
+                                --, Nvl(f.nfc_isis_wallet, ' ')   as "nfcIsisWalletCapable"
+                                , DECODE(f.mobile_messaging, '2WSMS/MO','Y', 'N') as "smsCapable"
+                                , (Select Nvl(Max(s.dacc_code), '00000') From sku_dacc s
+                                    Where s.prod_name  = l.prod_name
+                                      And s.mfg_code   = l.mfg_code
+                                      And s.effective_date = l.effective_date) as "dacc"
+                                , Nvl(l.device_family_type, ' ')       as "deviceFamilyType"
+                                , Nvl(l.buddy_upgrd_elig_ind, ' ')     as "buddyUpgrdEligInd"
+                                , Nvl(l.restrict_to_family_ind, ' ')   as "restrictToFamilyInd"
+                                , Nvl(f.hd_voice, ' ')                 as "hdVoice"
+                                , Nvl(t.coverage_check_4g, ' ')        as "coverageCheck4G"
+                                , Nvl(t.volte_4_business, ' ')         as "v4b"
+                                , Nvl(t.number_share_capability, ' ')  as "numberShareCapable"
+                                , Nvl(f.euicc_capable, ' ')  as "euiccCapable" --pratik
+                                , Nvl(f.esim_only_ind, ' ')  as "esimOnlyInd" --BQVT-4304
+                                , Nvl(f.vendor_key, ' ')  as "vendorKey" --BQVT-4610
+                                , Nvl(f.dsds, ' ') as "dsds"  --BQVT-4693
+                                , Nvl((Select os_type From software s
+                                    Where s.prod_name  = l.prod_name
+                                      And s.mfg_code   = l.mfg_code
+                                      And s.effective_date = l.effective_date), ' ') as "operatingSystem"
+                                , Nvl((Select max(eligible_num_share_os) From DMD_UNIVERSAL_API_DATA api
+                                    Where api.prod_name  = l.prod_name
+                                      And api.mfg_code   = l.mfg_code
+                                      And api.effective_date = l.effective_date), ' ') as "eligibleNumShareOS"
+                                , ( Select decode(count(*), 0, 'N', 'Y')
+                                      From im_eg_accessory ai, launch_package li, im_eg_acc_xref xi
+                                     Where ai.mnfr_id = 0
+                                       And ai.universal_type in (select distinct universal_type from im_eg_accessory)
+                                       And ai.universal_type    <> 'None'
+                                       And li.device_family_name = l.device_family_name
+                                       And xi.equip_id           = li.equip_id
+                                       And xi.acc_id             = ai.acc_id) as "universalDevice"
+                                , Nvl(f.wifi_calling, ' ')        as "wifiCalling"
+                                , Nvl(f.E911_ADDR_IND, ' ')        as "e911AddrInd"
+                                , Case When ie.equip_id Is Null Then
+                                        ' '
+                                  Else Nvl((Select distinct 'N' From im_eg_feat_attr_xref x
+                                        Where x.equip_id = ie.equip_id and x.feature_id  = '1744'), 'Y') End as "cdmaCapableInd"
+                                , Case When d.device_mask like '4G%' Then
+                                       'Y'
+                                       When ie.equip_id Is Null Then
+                                       ' '
+                                  Else Nvl((Select distinct 'Y' From im_eg_feat_attr_xref x
+                                        Where x.equip_id = ie.equip_id and x.feature_id  In ('1773', '915')), 'N') end as "gsmCapableInd"
+										--BQVT-957
+                                , Nvl(l.device_carrier, ' ')        as "deviceCarrier"
+                                , Nvl((select to_char(POSTPAID_RESTRICT_START_DATE,'MM/DD/YYYY') from restrict_devices where device_sku = l.dymax_bam),' ') as "postpaidRestrictStartDate"
+                                , Nvl((select to_char(PREPAY_RESTRICT_START_DATE,'MM/DD/YYYY') from restrict_devices where device_sku = l.dymax_bam),' ') as "prepayRestrictStartDate"
+                                )
+                                , XMLElement("universalPropCdList"
+                                                , (Select XMLAgg(XMLElement("universalPropCd", iv.vzw_model))
+                                                     From ( Select distinct li.device_family_name, ai.vzw_model
+                                                              From im_eg_accessory ai, launch_package li, im_eg_acc_xref xi
+                                                             Where ai.mnfr_id = 0
+                                                               And ai.universal_type    In (select distinct universal_type from im_eg_accessory)
+                                                               And ai.universal_type    <> 'None'
+                                                               And xi.equip_id           = li.equip_id
+                                                               And xi.acc_id             = ai.acc_id) iv
+                                                     Where iv.device_family_name = l.device_family_name))
+                                , XMLElement("deviceSkuList"
+                                                , (Select XMLAgg(
+                                                            XMLElement("deviceSkuInfo"
+                                                                , XMLForest( s.sku_code                    as "deviceSku"
+                                                                           , Nvl(sim_model_id, ' ')        as "virtualSimSku"
+                                                                           , f_get_sku_type(s.sku_code)    as "skuType"
+                                                                           , i.itm_class1                  as "prodCode1"
+                                                                           , i.itm_class2                  as "prodCode2"
+                                                                           , i.itm_class3                  as "prodCode3"
+                                                                           , i.itm_class4                  as "prodCode4"
+                                                                           , i.itm_class5                  as "prodCode5"
+                                                                           , Nvl(i.itm_bta_eligible, ' ')  as "btaEligiblity"
+                                                                           , Nvl(i.itm_upc, ' ')           as "upcCode"
+                                                                           , Nvl(i.itm_prepay_sku, 'N')    as "prepaySkuInd"
+                                                                           , Nvl(i.itm_wave_eligible, ' ') as "edgeEligibleInd"
+                                                                           , Nvl(i.itm_dpc_group, ' ')     as "edgeDpcGroup"
+                                                                           , Nvl(i.itm_dpc_item, ' ')      as "edgeDpcItem"
+                                                                           , i.itm_last_cost               as "itemCost"
+                                                                           , (Select Nvl(to_char(max(i.equip_id)), ' ')
+                                                                                From im_eg_equipment i
+                                                                               Where i.inventory_id  = s.sku_code
+                                                                                 And i.delete_flag   <> 'Y')     as "imEquipID"
+                                                                           , Nvl(i.itm_upc_full, ' ')            as "upcCodeFull"
+                                                                           , i.itm_device_cap                    as "edgeDeviceCap"
+                                                                           , Nvl(i.instant_credit_eligible, ' ') as "instantCredit"
+                                                                           , Nvl(Decode(i.ispu_eligible, 'X', 'Y', i.ispu_eligible), ' ') as "ispuEligible"
+                                                                           , (Select Nvl(REPLACE(REPLACE(max(i.prop65_warning),CHR(10),' '),CHR(13),' '),' ')
+                                                                                  From im_eg_equipment i
+                                                                                  Where i.inventory_id  = s.sku_code
+                                                                                  And i.delete_flag   <> 'Y')  as "prop65"
+                                                                           )
+                                                                           ,  XMLElement("pairedSkuInfo"
+                                                                               , (Select XMLAgg( XMLElement("pairedImeiSku", imei2_sku))
+                                                                                 from sku_pair where imei1_sku=s.sku_code
+                                                                             ))))
+                                                     From sku_dacc s, item i, model_product mp
+--                                                     , im_eg_equipment e
+                                                    Where s.sku_code       = i.itm_part
+                                                      And mp.model_id(+)   = s.sku_code
+                                                      And s.prod_name      = l.prod_name
+                                                      And s.mfg_code       = l.mfg_code
+                                                      And s.effective_date = l.effective_date
+--                                                      And e.equip_id=l.equip_id
+                                                      ))
+                                , XMLElement("imFeatureNameList"
+                                                 , (Select XMLAgg( XMLElement("imFeatureName", feature_name))
+                                                      From ( Select distinct b.feature_name, a.inventory_id, a.equip_id
+                                                               From im_eg_equipment a, im_eg_feature_attr b, im_eg_feat_attr_xref c
+                                                              Where a.retired       = 'N'
+                                                                And a.active_flag   = 'Y'
+                                                                And a.delete_flag   = 'N'
+                                                                And a.equip_id      = c.equip_id
+                                                                And b.compare_flag  = 'Y'
+                                                                And b.feature_id    = c.feature_id) iv
+                                                     Where iv.equip_id = ie.equip_id ))
+                                , XMLElement("marketingCompatibleSimSkuList"
+                                                 , (Select XMLAgg( XMLElement("simSku", sku_code))
+                                                      From sku_dacc s, device_sim_compatibility dc
+                                                         , (Select prod_name, mfg_code, effective_date, max(dacc_code) dacc_code
+                                                              From sku_dacc
+                                                             Group By prod_name, mfg_code, effective_date) s2
+                                                     Where dc.dacc           = s2.dacc_code
+                                                       And s2.prod_name      = l.prod_name
+                                                       And s2.mfg_code       = l.mfg_code
+                                                       And s2.effective_date = l.effective_date
+                                                       And s.dacc_code       = dc.sacc))
+                              ).getClobVal() deviceInfoList
+              From launch_package l, manufacturer m, equipment_model e, im_eg_equipment ie, features f, (select distinct PROD_MODEL_NAME,MANUFACTURE_NAME from OD_DATA_LOAD) od --BQVT-1709
+                 , device_mask d, technology t, physical_attributes ph, Table(Cast(l_prod_name_list as string_array)) inp
+             Where (l.display_ind is null Or trim(upper(l.display_ind)) <> 'N' Or l.bcc_ind = 'Y')
+               And l.prod_name          = inp.column_value
+               And m.mfg_code(+)        = l.mfg_code
+               And od.prod_model_name(+)= l.prod_name   --BQVT-1709
+               And e.prod_name          = l.prod_name
+               And e.mfg_code           = l.mfg_code
+               And e.effective_date     = l.effective_date
+               And f.prod_name          = l.prod_name
+               And f.mfg_code           = l.mfg_code
+               And f.effective_date     = l.effective_date
+               And f.device_mask_id     = d.device_mask_id(+)
+               And t.prod_name(+)       = l.prod_name
+               And t.mfg_code(+)        = l.mfg_code
+               And t.effective_date(+)  = l.effective_date
+               And ph.prod_name(+)      = l.prod_name
+               And ph.mfg_code(+)       = l.mfg_code
+               And ph.effective_date(+) = l.effective_date
+               And ie.equip_id(+)       = l.equip_id;
+
+     End sp_get_dev_info;
+
+     Procedure  sp_get_dev_fml_info_eff(l_dev_fam_list string_array
+                                         ,p_eff_beg_dt In Date
+                                         ,p_result_set Out Sys_RefCursor) as
+       Begin
+       Open p_result_set For
+         Select XMLElement("deviceFamilyInfo"
+                                , XMLElement("familyName", family_name)
+                                , XMLElement("imAccessoryList", save_ele, remove_ele)).getClobVal() as deviceFamilyInfo
+                       From ( Select inp.column_value family_name
+                                 , XMLElement("save"
+                                        , ( Select XMLAgg( XMLElement("accSku", vzw_model))
+                                              From ( Select distinct l.device_family_name, a.vzw_model
+                                                       From launch_package l, im_eg_acc_xref_hist x, item i, im_eg_accessory a
+                                                      Where a.acc_id             = x.acc_id
+                                                        And a.delete_flag       <> 'Y'
+                                                        And l.equip_id           = x.equip_id
+                                                        And x.action             = 'I'
+                                                        And i.itm_part           = a.vzw_model
+                                                        And x.create_dt         >= p_eff_beg_dt
+                                                        And Nvl(a.dnh_acc, 'N')  = 'N'
+                                                        And Not Exists (Select 1 from mv_atg_acc_comp_check
+                                                                         Where sor_display_name = l.device_family_name
+                                                                           And accessory_sor_id = a.vzw_model)
+                                                        And Exists ( Select 'Yes' From im_eg_acc_xref ox
+                                                                      Where ox.acc_id   = x.acc_id
+                                                                        And ox.equip_id = x.equip_id))
+                                             Where device_family_name = inp.column_value)) as save_ele
+                                 , XMLElement("remove"
+                                        , ( Select XMLAgg( XMLElement("accSku", vzw_model))
+                                              From ( Select distinct l.device_family_name, a.vzw_model
+                                                       From launch_package l, im_eg_acc_xref_hist x, item i, im_eg_accessory a
+                                                      Where a.acc_id             = x.acc_id
+                                                        And l.equip_id           = x.equip_id
+                                                        And x.action             = 'D'
+                                                        And i.itm_part           = a.vzw_model
+                                                        And x.create_dt         >= p_eff_beg_dt
+                                                        And Nvl(a.dnh_acc, 'N')  = 'N'
+                                                        And Not Exists ( Select 'No' From im_eg_acc_xref ox, launch_package li, im_eg_accessory ai
+                                                                          Where ai.vzw_model          = a.vzw_model
+                                                                            And ai.delete_flag       <> 'Y'
+                                                                            And li.device_family_name = l.device_family_name
+                                                                            And ox.acc_id             = ai.acc_id
+                                                                            And ox.equip_id           = li.equip_id))
+                                             Where device_family_name = inp.column_value)) as remove_ele
+                              From Table(Cast(l_dev_fam_list as string_array)) inp );
+       End  sp_get_dev_fml_info_eff;
+
+
+      Procedure  sp_get_dev_fml_info_sku(l_fam_full_list string_array
+                                         ,p_result_set Out Sys_RefCursor) as
+      Begin
+       Open p_result_set For
+             Select XMLElement("deviceFamilyInfo"
+                                , XMLElement("familyName", family_name)
+                                , XMLElement("imAccessoryList", save_ele)).getClobVal() as deviceFamilyInfo
+                       From ( Select inp.column_value family_name
+                                 , XMLElement("save"
+                                        , ( Select XMLAgg( XMLElement("accSku", vzw_model))
+                                              From ( Select distinct l.device_family_name, a.vzw_model
+                                                       From launch_package l, im_eg_acc_xref x, item i, im_eg_accessory a
+                                                      Where a.acc_id             = x.acc_id
+                                                        And l.equip_id           = x.equip_id
+                                                        And i.itm_part           = a.vzw_model)
+                                             Where device_family_name = inp.column_value)) as save_ele
+                              From Table(Cast(l_fam_full_list as string_array)) inp ) ;
+     End sp_get_dev_fml_info_sku;
+
+
+     Procedure sp_get_dev_fml_info( p_device_sku_list   In Varchar2
+                            , p_eff_beg_dt         In Date
+                            , p_result_set       Out Sys_RefCursor) As
+
+        l_dev_fam_list   string_array;
+        l_fam_full_list  string_array;
+
+      Begin
+                  DBMS_OUTPUT.PUT_LINE (p_eff_beg_dt || ':p_eff_beg_dt');
+
+        If p_eff_beg_dt Is Not Null Then
+            For rec in (Select distinct acc_sku
+                          From omni_feed_changes
+                         Where last_update_dt >= p_eff_beg_dt
+                           And prod_name       = 'ACC_SKU'
+                           And acc_sku        Is Not Null)
+            Loop
+                sp_comp_sync_by_acc(rec.acc_sku);
+            End Loop;
+        End If;
+
+        For rec in (Select itm_part From item where itm_class1 = 'ACC'
+                    Minus
+                    Select itm_part From item_bkp where itm_class1 = 'ACC')
+        Loop
+            sp_comp_sync_by_acc(rec.itm_part);
+        End Loop;
+
+        If p_device_sku_list Is Not Null Then
+            Select Distinct l.device_family_name
+             Bulk Collect Into l_dev_fam_list
+              From launch_package l, model_product mp
+             Where ',' || trim(p_device_sku_list) || ',' like '%,' || mp.model_id || ',%'
+               And mp.prod_name      = l.prod_name
+               And mp.mfg_code       = l.mfg_code
+               And mp.effective_date = l.effective_date;
+
+             If p_eff_beg_dt Is Null Then
+                l_fam_full_list := l_dev_fam_list;
+                l_dev_fam_list  := Null;
+             End If;
+              sp_get_dev_fml_info_sku( l_fam_full_list , p_result_set);
+        ElsIf p_eff_beg_dt Is Not Null Then
+            Select Distinct l.device_family_name
+              Bulk Collect Into l_dev_fam_list
+              From im_eg_acc_xref_hist x, launch_package l, im_eg_accessory a
+             Where x.equip_id           = l.equip_id
+               And x.create_dt         >= p_eff_beg_dt
+               And x.acc_id             = a.acc_id
+               And Nvl(a.dnh_acc, 'N')  = 'N';
+               sp_get_dev_fml_info_eff(l_dev_fam_list, p_eff_beg_dt, p_result_set);
+        End If;
+      End sp_get_dev_fml_info;
+
+
+      Procedure sp_get_acc_info( p_acc_sku_list   In Varchar2
+                              ,p_eff_beg_dt    In Date
+                              , p_result_set       Out Sys_RefCursor) As
+        l_acc_sku_list string_array;
+        Begin
+       If p_eff_beg_dt Is Not Null Then
+            Select distinct acc_sku
+              Bulk Collect Into l_acc_sku_list
+              From ( Select distinct vzw_model as acc_sku
+                       From im_eg_accessory
+                      Where update_date >= p_eff_beg_dt
+                         Or create_date >= p_eff_beg_dt
+                     Union
+                     Select distinct itm_part as acc_sku
+                       From item
+                      Where itm_class1            = 'ACC'
+                        And Nvl(itm_class4, 'D') <> 'DSB'
+                        And itm_date_add         >= p_eff_beg_dt
+                     Union
+                     Select distinct itm_part
+                       From ( Select itm_part, itm_description, itm_bta_eligible, itm_upc, itm_upc_full
+                                   , itm_class1, itm_class2, itm_class3, itm_class4,i.itm_dpc_group
+                                            , i.itm_dpc_item, itm_class5, ispu_eligible
+                                From item i
+                               Where itm_class1 = 'ACC'
+                                 And Nvl(itm_class4, 'D') <> 'DSB'
+                               Minus
+                              Select itm_part, itm_description, itm_bta_eligible, itm_upc, itm_upc_full
+                                   , itm_class1, itm_class2, itm_class3, itm_class4,  i.itm_dpc_group
+                                            , i.itm_dpc_item,itm_class5, ispu_eligible
+                                From item_bkp i));
+        ElsIf p_acc_sku_list Is Not Null and length(trim(p_acc_sku_list)) > 0 Then
+            Select distinct acc_sku
+              Bulk Collect Into l_acc_sku_list
+              From ( Select distinct vzw_model as acc_sku
+                       From im_eg_accessory
+                      where ',' || trim(p_acc_sku_list) || ',' like '%,' || vzw_model || ',%'
+                     Union
+                     Select distinct itm_part as acc_sku
+                       From Item
+                       where ',' || trim(p_acc_sku_list) || ',' like '%,' || itm_part || ',%'
+                        and itm_class1              = 'ACC'
+                        And Nvl(itm_class4, 'D')   <> 'DSB');
+        End If;
+
+         Open p_result_set For
+          Select XMLElement("accessoryInfo"
+                             , XMLForest( i.itm_part                                as "accessorySku"
+--                                        , Nvl(m.mnfr_name, ' ')                     as "imManufacturer"
+--                                        , '![CDATA['||Nvl(m.mnfr_name, ' ')||']]'   as "imManufacturer"
+                                        , XMLCDATA(Nvl(m.mnfr_name, ' ')) as "imManufacturer"
+                                        , Nvl(a.mktg_name, i.itm_description)       as "imAccessoryMktgName"
+                                        , Nvl(a.description, i.itm_description)     as "imAccessoryDesc"
+                                        , Nvl(ap.type_name, ' ')                    as "accessoryType"
+                                        , Nvl(to_char(ap.type_id), ' ')             as "accessoryTypeId"
+                                        , Nvl(a.image_location, ' ')                as "imImageUrl"
+                                        , i.itm_class1                              as "prodCode1"
+                                        , i.itm_class2                              as "prodCode2"
+                                        , i.itm_class3                              as "prodCode3"
+                                        , i.itm_class4                              as "prodCode4"
+                                        , i.itm_class5                              as "prodCode5"
+                                        , Nvl(i.itm_bta_eligible, ' ')              as "btaEligiblity"
+                                        , Nvl(i.itm_upc, ' ')                       as "upcCode"
+                                        , Decode( a.universal_type
+                                                , Null, 'N', 'None', 'N'
+                                                , 'Y')                              as "universalAcc"
+                                        , Nvl(i.itm_upc_full, ' ')                  as "upcCodeFull"
+                                        --, Nvl(i.ispu_eligible, ' ')                 as "ispuEligible")
+                                        , Nvl(Decode(i.ispu_eligible, 'X', 'Y', i.ispu_eligible), ' ') as "ispuEligible"
+                                         ,(Select Nvl(REPLACE(REPLACE(max(ac.prop65_warning),CHR(10),' '),CHR(13),' '),' ')
+                                         from im_eg_accessory ac where
+                                         i.itm_part     = ac.vzw_model(+)
+                                         )as "prop65",
+                                         i.itm_dpc_group as "edgeDpcGroup",
+                                         i.itm_dpc_item as "edgeDpc"
+                                         )
+                                        , XMLElement("universalPropCdList"
+                                                        , (Select XMLAgg(XMLElement("universalPropCd", iv.vzw_model))
+                                                             From ( Select distinct ai.vzw_model, ai.universal_type
+                                                                      From im_eg_accessory ai
+                                                                     Where ai.mnfr_id = 0
+                                                                       And ai.universal_type    In (select distinct universal_type from im_eg_accessory)
+                                                                       And ai.universal_type    <> 'None') iv
+                                                             Where iv.universal_type = a.universal_type)))
+                                              .getClobVal() as accessoryInfo
+              From im_eg_accessory a, im_eg_manufacturer m, im_eg_acc_type ap, item i
+                 , Table(Cast(l_acc_sku_list as string_array)) inp
+             Where i.itm_part     = inp.column_value
+               And m.mnfr_id(+)   = a.mnfr_id
+               And i.itm_part     = a.vzw_model(+)
+               And ap.type_id(+)  = a.acc_type
+               And Nvl(a.dnh_acc, 'N')     <> 'Y'
+               And Nvl(a.delete_flag, 'N') <> 'Y'
+               And Nvl(i.itm_class4, 'D')  <> 'DSB';
+    End sp_get_acc_info;
+
+     Procedure sp_get_soft_sku_info( p_soft_sku_list   In Varchar2
+                                  ,  p_eff_beg_dt    In Date
+                                  ,  p_result_set       Out Sys_RefCursor) As
+
+        l_soft_sku_list string_array;
+
+        Begin
+
+        If p_eff_beg_dt Is Not Null Then
+              Select distinct itm_part as acc_sku
+                Bulk Collect Into l_soft_sku_list
+                From (
+                    Select itm_part
+                      From item
+                     Where itm_class1    In ('PPP', 'ACT', 'ADJ', 'LAB', 'LCS', 'WRP', 'WPP', 'TAX', 'WAR', 'CRD', 'SEC', 'FUL', 'CRF', 'NIN', 'QAC','SVC')
+                       And itm_date_add  >= p_eff_beg_dt
+                        Union
+                    Select distinct itm_part
+                       From ( Select itm_part, itm_description, i.itm_short_desc, itm_type
+                                   , itm_class1, itm_class2, itm_class3, itm_class4, itm_class5
+                                From item i
+                               Where itm_class1    In ('PPP', 'ACT', 'ADJ', 'LAB', 'LCS', 'WRP', 'WPP', 'TAX', 'WAR', 'CRD', 'SEC', 'FUL', 'CRF', 'NIN', 'QAC','SVC')
+                               Minus
+                              Select itm_part, itm_description, i.itm_short_desc, itm_type
+                                   , itm_class1, itm_class2, itm_class3, itm_class4, itm_class5
+                                From item_bkp i
+                               Where itm_class1    In ('PPP', 'ACT', 'ADJ', 'LAB', 'LCS', 'WRP', 'WPP', 'TAX', 'WAR', 'CRD', 'SEC', 'FUL', 'CRF', 'NIN', 'QAC','SVC')));
+        ElsIf p_soft_sku_list Is Not Null and length(trim(p_soft_sku_list)) > 0 Then
+              Select distinct itm_part as acc_sku
+                Bulk Collect Into l_soft_sku_list
+                From item
+               Where ',' || trim(p_soft_sku_list) || ',' like '%,' || itm_part || ',%'
+                And  itm_class1 In ('PPP', 'ACT', 'ADJ', 'LAB', 'LCS', 'WRP', 'WPP', 'TAX', 'WAR', 'CRD', 'SEC', 'FUL', 'CRF', 'NIN', 'QAC','SVC');
+        End If;
+
+        Open p_result_set For
+
+         Select XMLElement("softSkuInfo"
+                             , XMLForest( i.itm_part            as "softSku"
+                                        , i.itm_description     as "softSkuDesc"
+                                        , i.itm_short_desc      as "softSkuShortDesc"
+                                        , i.itm_type            as "skuType"
+                                        , Nvl(i.itm_upc, ' ') 		as "upcCode"
+										, Nvl(i.itm_upc_full, ' ') 	as "upcCodeFull"
+                                        , i.itm_class1          as "prodCode1"
+                                        , i.itm_class2          as "prodCode2"
+                                        , i.itm_class3          as "prodCode3"
+                                        , i.itm_class4          as "prodCode4"
+                                        , i.itm_class5          as "prodCode5"
+                                        , i.itm_dpc_group       as "edgeDpcGroup"  --BVQ 2268 changes
+                                        , i.itm_dpc_item        as "edgeDpcItem")) --BVQ 2268 changes
+                                              .getClobVal() as softSkuInfo
+              From item i
+                 , Table(Cast(l_soft_sku_list as string_array)) inp
+             Where i.itm_part     = inp.column_value;
+     End sp_get_soft_sku_info;
+
+	Procedure sp_item_bkp_tmp (sku_type In varchar2) as
+     Begin
+     Execute Immediate 'TRUNCATE TABLE ITEM_BCC_TEMP';
+     If sku_type Is Not Null and length(trim(sku_type)) > 0 Then
+
+       If sku_type like 'DEVICE' then
+        Insert Into ITEM_BCC_TEMP( ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+          , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+          , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+          , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE)
+           Select ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+                        , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+                        , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+                        , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE
+                     From ITEM where itm_part in ( select mp.model_id From model_product mp
+                     where Not Exists (Select 1 From dmd_universal_api_data d
+           Where d.device_sku   = mp.model_id
+           And d.device_mask In ('4GS', '4GK','5GM','5GS')));
+
+        ElsIf   sku_type like 'ACCESSORY' then
+          Insert Into ITEM_BCC_TEMP( ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+          , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+          , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+          , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE)
+           Select ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+                        , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+                        , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+                        , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE
+                     From ITEM
+                    Where itm_class1 = 'ACC'
+                                 And Nvl(itm_class4, 'D') <> 'DSB';
+
+        ElsIf   sku_type like 'SIM' then
+          Insert Into ITEM_BCC_TEMP( ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+          , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+          , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+          , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE)
+           Select ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+                        , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+                        , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+                        , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE
+                     From ITEM where itm_part in ( select mp.model_id From model_product mp
+                     where Exists (Select 1 From dmd_universal_api_data d
+           Where d.device_sku   = mp.model_id
+           And d.device_mask In ('4GS', '4GK','5GM','5GS')));
+
+        ElsIf   sku_type like 'SOFTSKU' then
+           Insert Into ITEM_BCC_TEMP( ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+          , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+          , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+          , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE)
+           Select ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+                        , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+                        , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+                        , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE
+                     From ITEM
+                   Where itm_class1    In ('PPP', 'ACT', 'ADJ', 'LAB', 'LCS', 'WRP', 'WPP', 'TAX', 'WAR', 'CRD', 'SEC', 'FUL', 'CRF', 'NIN', 'QAC','SVC');
+
+       End IF;
+       COMMIT;
+      End IF;
+   End sp_item_bkp_tmp;
+
+   Procedure sp_item_bkp_commit as
+      Begin
+      delete item_bkp where itm_part in ( SELECT itm_part FROM ITEM_BCC_TEMP);
+      Insert Into item_bkp( ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+          , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+          , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+          , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE)
+           Select ITM_PART, ITM_CLASS1, ITM_CLASS2, ITM_CLASS3, ITM_CLASS4, ITM_CLASS5
+                        , ITM_DESCRIPTION, ITM_SHORT_DESC, ITM_TYPE, ITM_BTA_ELIGIBLE, ITM_UPC
+                        , ITM_PREPAY_SKU, ITM_WAVE_ELIGIBLE, ITM_DPC_GROUP, ITM_DPC_ITEM, ITM_LAST_COST
+                        , ITM_UPC_FULL, ITM_DEVICE_CAP, INSTANT_CREDIT_ELIGIBLE, ISPU_ELIGIBLE
+                     From ITEM_BCC_TEMP;
+      Execute Immediate 'TRUNCATE TABLE ITEM_BCC_TEMP';
+         COMMIT;
+    End sp_item_bkp_commit;
+
+    Procedure sp_create_omni_feed_file_1( p_device_sku   In Varchar2
+                                     , p_delta_only   In Varchar2
+                                     , p_eff_beg_dt   In Date
+                                     , p_email_notif  In Varchar2) As
+        lc_dest_clob_xml Clob;
+        lc_tmp_clob      Clob;
+        l_outfile        utl_file.file_type;
+        l_file_started   boolean := false;
+        ls_file_name     Varchar2(50);
+        ls_err_msg       Varchar2(4000);
+        ls_feed_params   Varchar2(256);
+        Begin
+
+        ls_file_name := 'DMD_FEED_'||to_char(sysdate, 'YYYYMMDD-HH24MISS')||'.xml';
+        l_outfile := utl_file.fopen( 'CASS_DATA_OUT', ls_file_name, 'w', max_linesize => 90000);
+
+        l_file_started := false;
+        sp_print_device_info( p_device_sku, p_eff_beg_dt, l_file_started, l_outfile);
+
+        If l_file_started Then
+            utl_file.put(l_outfile, '</dmd>');
+        Else
+            utl_file.put(l_outfile, '<dmd></dmd>');
+        End If;
+
+        utl_file.new_line(l_outfile);
+        utl_file.fflush(l_outfile);
+        utl_file.fclose( l_outfile );
+        g_feed_gen_succ := true;
+
+    Exception
+        When Others Then
+            ls_err_msg := sqlerrm || CHR(13) || dbms_utility.format_error_backtrace;
+
+    End sp_create_omni_feed_file_1;
+End DMD_PKG_GEN_OMNI_FEED;
