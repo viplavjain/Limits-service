@@ -1739,3 +1739,108 @@ DMD Admin Team.
 
     End sp_create_omni_feed_file_1;
 End DMD_PKG_GEN_OMNI_FEED;
+--------------------------------------------------------------------------------
+launch_package:
+
+prod_name
+device_family_name
+mfg_code
+prod_type
+device_category
+buddy_upgrd_elig_ind
+restrict_to_family_ind
+hd_voice
+device_carrier
+dymax_bam (used for restrictions)
+equip_id (joined with im_eg_equipment)
+manufacturer:
+
+mfg_name (joined with launch_package)
+equipment_model:
+
+prod_type (joined with launch_package)
+im_eg_equipment:
+
+equip_name
+main_image
+Device_Category
+equip_id (used for joining with im_eg_feature_attr_xref)
+features:
+
+global_phone
+ba (backupAssistCapable)
+nfc_capable
+nfc_compatible
+mobile_messaging
+sim_form_factor
+wifi_calling
+E911_ADDR_IND
+euicc_capable
+esim_only_ind
+vendor_key
+dsds
+device_mask_id (joined with device_mask)
+device_mask:
+
+device_mask (joined with features)
+technology:
+
+dcat (deviceCapabilityInd)
+coverage_check_4g
+volte_4_business
+number_share_capability (joined with launch_package)
+physical_attributes:
+
+sim_class_4g (joined with launch_package)
+OD_DATA_LOAD:
+
+PROD_MODEL_NAME
+MANUFACTURE_NAME (joined with launch_package)
+sku_dacc:
+
+sku_code
+prod_name
+mfg_code
+effective_date
+dacc_code (joined with device_sim_compatibility)
+item:
+itm_part
+itm_class1
+itm_class2
+itm_class3
+itm_class4
+itm_class5
+itm_bta_eligible
+itm_upc
+itm_prepay_sku
+itm_wave_eligible
+itm_dpc_group
+itm_dpc_item
+itm_last_cost
+itm_upc_full
+itm_device_cap
+instant_credit_eligible
+ispu_eligible
+itm_description
+itm_date_add
+model_product:
+model_id
+prod_name (joined with sku_dacc)
+im_eg_accessory:
+vzw_model
+mnfr_id
+universal_type
+mktg_name
+description
+image_location
+type_name
+type_id
+acc_id (joined with im_eg_acc_xref)
+im_eg_acc_xref:
+equip_id
+acc_id (joined with im_eg_accessory)
+im_eg_feature_attr:
+feature_name
+feature_id (joined with im_eg_feat_attr_xref)
+im_eg_feat_attr_xref:
+equip_id (
