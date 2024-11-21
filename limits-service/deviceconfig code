@@ -1,0 +1,41 @@
+public static void main(String[] args) {
+        String jsonString = "{ ... your JSON string here ... }";
+
+        try {
+            FileReader reader = new FileReader("config.json");
+            JSONObject jsonObject = new JSONObject(reader);
+            reader.close();
+            JSONArray deviceArray = jsonObject.getJSONArray("items").getJSONArray("device");
+
+            Map<String, String> keyMap = new HashMap<>();
+
+            for (int i = 0; i < deviceArray.length(); i++) {
+                JSONObject deviceObject = deviceArray.getJSONObject(i);
+                String genericKey = deviceObject.getString("genericKey");
+
+                JSONArray detailsArray = deviceObject.getJSONArray("details");
+                for (int j = 0; j < detailsArray.length(); j++) {
+                    JSONObject detailObject = detailsArray.getJSONObject(j);
+                    JSONArray systemsArray = detailObject.getJSONArray("system");
+
+                    for (int k = 0; k < systemsArray.length(); k++) {
+                        JSONObject systemObject = systemsArray.getJSONObject(k);
+                        String system = systemObject.getString("system");
+                        String key = systemObject.getString("key");
+
+                        if (!system.isEmpty() && !key.isEmpty()) {
+                            keyMap.put(key, genericKey);
+                        }
+                    }
+                }
+            }
+
+            // Print the HashMap
+            for (Map.Entry<String, String> entry : keyMap.entrySet()) {
+                System.out.println(entry.getKey() + " -> " + entry.getValue());
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
