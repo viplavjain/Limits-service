@@ -8,21 +8,14 @@
                         {
                             "system": "DMD",
                             "key": "skucodeDMD"
-                        },
-                        {
-                            "system": "DPI",
-                            "key": ""
-                        },
-                        {
-                            "system": "SAP",
-                            "key": ""
                         }
+                        
                     ]
                     ,
                     "Authorization": [
                         {
                             "system": "EPC",
-                            "key": "skuDevicecodeEPC"
+                            "key": "skucodeEPC"
                         }
                     ]
                     ,
@@ -30,65 +23,49 @@
                         {
                             "system": "Cassandra",
                             "key": ""
-                        },
-                        {
-                            "system": "Federated",
-                            "key": ""
                         }
+                        
                     ]
                     ,
                     "Cache": [
                         {
                             "system": "Redis",
-                            "key": "prodName"
-                        },
-                        {
-                            "system": "Elastic Search",
-                            "key": "sor_display_name"
+                            "key": ""
                         }
+                        
                     ]
                     ,
                     "Destination": [
                         {
                             "system": "Fusion",
                             "key": ""
-                        },
-                        {
-                            "system": "CXP",
-                            "key": "Maple"
                         }
+                        
                     ]
                 }
             },
-			
-                "genericKey": "prod_name",
+			{
+                "genericKey": "prodName",
                 "details": {
                     "source": [
                         {
                             "system": "DMD",
-                            "key": "prod_name"
-                        },
-                        {
-                            "system": "DPI",
-                            "key": ""
-                        },
-                        {
-                            "system": "SAP",
-                            "key": ""
+                            "key": "prodNameDMD"
                         }
+                        
                     ]
                     ,
                     "Authorization": [
                         {
                             "system": "EPC",
-                            "key": "production_name"
+                            "key": "prodNameEPC"
                         }
                     ]
                     ,
                     "Persistence": [
                         {
                             "system": "Cassandra",
-                            "key": "name"
+                            "key": ""
                         },
                         {
                             "system": "Federated",
@@ -99,11 +76,11 @@
                     "Cache": [
                         {
                             "system": "Redis",
-                            "key": "prodName"
+                            "key": ""
                         },
                         {
                             "system": "Elastic Search",
-                            "key": "sor_display_name"
+                            "key": ""
                         }
                     ]
                     ,
@@ -111,14 +88,11 @@
                         {
                             "system": "Fusion",
                             "key": ""
-                        },
-                        {
-                            "system": "CXP",
-                            "key": "Maple"
                         }
+                        
                     ]
                 }
             }
         ]
     }
-}
+}	
