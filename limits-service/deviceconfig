@@ -1,0 +1,124 @@
+{
+    "items": {
+        "device": [
+            {
+                "genericKey": "skucode",
+                "details": {
+                    "source": [
+                        {
+                            "system": "DMD",
+                            "key": "skucodeDMD"
+                        },
+                        {
+                            "system": "DPI",
+                            "key": ""
+                        },
+                        {
+                            "system": "SAP",
+                            "key": ""
+                        }
+                    ]
+                    ,
+                    "Authorization": [
+                        {
+                            "system": "EPC",
+                            "key": "skuDevicecodeEPC"
+                        }
+                    ]
+                    ,
+                    "Persistence": [
+                        {
+                            "system": "Cassandra",
+                            "key": ""
+                        },
+                        {
+                            "system": "Federated",
+                            "key": ""
+                        }
+                    ]
+                    ,
+                    "Cache": [
+                        {
+                            "system": "Redis",
+                            "key": "prodName"
+                        },
+                        {
+                            "system": "Elastic Search",
+                            "key": "sor_display_name"
+                        }
+                    ]
+                    ,
+                    "Destination": [
+                        {
+                            "system": "Fusion",
+                            "key": ""
+                        },
+                        {
+                            "system": "CXP",
+                            "key": "Maple"
+                        }
+                    ]
+                }
+            },
+			
+                "genericKey": "prod_name",
+                "details": {
+                    "source": [
+                        {
+                            "system": "DMD",
+                            "key": "prod_name"
+                        },
+                        {
+                            "system": "DPI",
+                            "key": ""
+                        },
+                        {
+                            "system": "SAP",
+                            "key": ""
+                        }
+                    ]
+                    ,
+                    "Authorization": [
+                        {
+                            "system": "EPC",
+                            "key": "production_name"
+                        }
+                    ]
+                    ,
+                    "Persistence": [
+                        {
+                            "system": "Cassandra",
+                            "key": "name"
+                        },
+                        {
+                            "system": "Federated",
+                            "key": ""
+                        }
+                    ]
+                    ,
+                    "Cache": [
+                        {
+                            "system": "Redis",
+                            "key": "prodName"
+                        },
+                        {
+                            "system": "Elastic Search",
+                            "key": "sor_display_name"
+                        }
+                    ]
+                    ,
+                    "Destination": [
+                        {
+                            "system": "Fusion",
+                            "key": ""
+                        },
+                        {
+                            "system": "CXP",
+                            "key": "Maple"
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+}
