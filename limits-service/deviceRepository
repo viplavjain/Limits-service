@@ -1,0 +1,123 @@
+package com.example.epcdemo.repository;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+@Repository
+public class DeviceInfoRepository {
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Transactional
+    public String getDeviceInfo(String skuCode) {
+        String sql = """
+                Select XMLElement("deviceInfo"
+                       , XMLForest(
+                           l.prod_name as "prodName",
+                           l.device_family_name as "familyName",
+                           l.mfg_code as "mfgCode",
+                           XMLCDATA(COALESCE(od.manufacture_name, l.real_manufacturer, m.mfg_name)) as "mfgName",
+                           Nvl(e.prod_type, ' ') as "prodType",
+                           Nvl(ie.equip_name, ' ') as "imProdName",
+                           Nvl(ie.main_image, ' ') as "imImageUrl",
+                           Nvl(ie.Device_Category, ' ') as "imDeviceCategory",
+                           Nvl(d.device_mask, ' ') as "deviceType",
+                           Nvl(f.global_phone, ' ') as "globalPhone",
+                           Nvl(l.device_category, ' ') as "deviceCategory",
+                           Nvl(t.dcat, ' ') as "deviceCapabilityInd",
+                           Nvl(f.ba, ' ') as "backupAssistCapable",
+                           (Select nvl(max(sc.sim_sku), ' ')
+                              from sim_4g_compatible_marketing sc
+                             Where sc.preferred_sim = 'Y'
+                               And sc.prod_name = l.prod_name
+                               And sc.mfg_code = l.mfg_code
+                               And sc.effective_date = l.effective_date) as "preferredSim",
+                           (Select nvl(max(sc.sim_sku), ' ')
+                              from sim_4g_compatible_marketing sc
+                             Where sc.preferred_soft_sim = 'Y'
+                               And sc.prod_name = l.prod_name
+                               And sc.mfg_code = l.mfg_code
+                               And sc.effective_date = l.effective_date) as "preferredSoftSim",
+                           (Select nvl(max(sc.sim_sku), ' ')
+                              from sim_4g_compatible_marketing sc
+                             Where sc.alternate_sim = 'Y'
+                               And sc.prod_name = l.prod_name
+                               And sc.mfg_code = l.mfg_code
+                               And sc.effective_date = l.effective_date) as "alternateSim",
+                           Nvl(ph.sim_class_4g, ' ') as "simClass4G",
+                           Nvl(f.nfc_capable, ' ') as "nfcCapable",
+                           Nvl(f.nfc_compatible, ' ') as "nfcCompatible",
+                           DECODE(f.mobile_messaging, '2WSMS/MO','Y', 'N') as "smsCapable",
+                           (Select Nvl(Max(s.dacc_code), '00000') From sku_dacc s
+                             Where s.prod_name = l.prod_name
+                               And s.mfg_code = l.mfg_code
+                               And s.effective_date = l.effective_date) as "dacc",
+                           Nvl(l.device_family_type, ' ') as "deviceFamilyType",
+                           Nvl(l.buddy_upgrd_elig_ind, ' ') as "buddyUpgrdEligInd",
+                           Nvl(l.restrict_to_family_ind, ' ') as "restrictToFamilyInd",
+                           Nvl(f.hd_voice, ' ') as "hdVoice",
+                           Nvl(t.coverage_check_4g, ' ') as "coverageCheck4G",
+                           Nvl(t.volte_4_business, ' ') as "v4b",
+                           Nvl(t.number_share_capability, ' ') as "numberShareCapable",
+                           Nvl(f.euicc_capable, ' ') as "euiccCapable",
+                           Nvl(f.esim_only_ind, ' ') as "esimOnlyInd",
+                           Nvl(f.vendor_key, ' ') as "vendorKey",
+                           Nvl(f.dsds, ' ') as "dsds",
+                           Nvl((Select os_type From software s
+                             Where s.prod_name = l.prod_name
+                               And s.mfg_code = l.mfg_code
+                               And s.effective_date = l.effective_date), ' ') as "operatingSystem",
+                           Nvl((Select max(eligible_num_share_os) From DMD_UNIVERSAL_API_DATA api
+                             Where api.prod_name = l.prod_name
+                               And api.mfg_code = l.mfg_code
+                               And api.effective_date = l.effective_date), ' ') as "eligibleNumShareOS",
+                           Nvl((Select Nvl(REPLACE(REPLACE(max(i.prop65_warning),CHR(10),' '),CHR(13),' '),' ')
+                             From im_eg_equipment i
+                             Where i.inventory_id = s.sku_code
+                               And i.delete_flag <> 'Y'), ' ') as "prop65"
+                           )
+                       , XMLElement("universalPropCdList",
+                           (Select XMLAgg(XMLElement("universalPropCd", iv.vzw_model))
+                            From (Select distinct li.device_family_name, ai.vzw_model
+                                  From im_eg_accessory ai, launch_package li, im_eg_acc_xref xi
+                                  Where ai.mnfr_id = 0
+                                    And ai.universal_type in (select distinct universal_type from im_eg_accessory)
+                                    And ai.universal_type <> 'None'
+                                    And xi.equip_id = li.equip_id
+                                    And xi.acc_id = ai.acc_id) iv
+                            Where iv.device_family_name = l.device_family_name))
+                       ).getClobVal() deviceInfoList
+                From launch_package l, manufacturer m, equipment_model e, im_eg_equipment ie, features f
+                Where (l.display_ind is null Or trim(upper(l.display_ind)) <> 'N' Or l.bcc_ind = 'Y')
+                  And l.prod_name = :skuCode;
+                """;
+
+        return (String) entityManager
+                .createNativeQuery(sql)
+                .setParameter("skuCode", skuCode)
+                .getSingleResult();
+    }
+}
+--------------------------------------------------
+  package com.example.epcdemo.service;
+
+import com.example.epcdemo.repository.DeviceInfoRepository;
+import org.springframework.stereotype.Service;
+
+@Service
+public class DeviceInfoService {
+
+    private final DeviceInfoRepository repository;
+
+    public DeviceInfoService(DeviceInfoRepository repository) {
+        this.repository = repository;
+    }
+
+    public String getDeviceInfo(String skuCode) {
+        return repository.getDeviceInfo(skuCode);
+    }
+}
+
