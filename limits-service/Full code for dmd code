@@ -1,0 +1,75 @@
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.r2dbc.core.ConnectionFactory;
+import org.springframework.r2dbc.core.ConnectionFactories;
+import org.springframework.r2dbc.core.ConnectionFactoryOptions;
+
+@Configuration
+public class R2dbcConfig {
+
+    // First Oracle R2DBC ConnectionFactory with correct credentials
+    @Bean("r2dbcFactory1")
+    public ConnectionFactory connectionFactory1() {
+        return ConnectionFactories.get(ConnectionFactoryOptions.builder()
+            .option(ConnectionFactoryOptions.DRIVER, "oracle")  // Ensure the driver is set to oracle
+            .option(ConnectionFactoryOptions.HOST, "sqa1posatgdb.ebiz.verizon.com")
+            .option(ConnectionFactoryOptions.PORT, 2055)  // Correct port for Oracle DB
+            .option(ConnectionFactoryOptions.DATABASE, "posatgsqa1")
+            .option(ConnectionFactoryOptions.USER, "atgrep")  // Use your username
+            .option(ConnectionFactoryOptions.PASSWORD, "atgaws123")  // Use your password
+            .build());
+    }
+
+    // Second Oracle R2DBC ConnectionFactory (if you have more than one)
+    @Bean("r2dbcFactory2")
+    public ConnectionFactory connectionFactory2() {
+        return ConnectionFactories.get(ConnectionFactoryOptions.builder()
+            .option(ConnectionFactoryOptions.DRIVER, "oracle")
+            .option(ConnectionFactoryOptions.HOST, "another-db-host")
+            .option(ConnectionFactoryOptions.PORT, 1521)  // Use the port for your other Oracle DB
+            .option(ConnectionFactoryOptions.DATABASE, "another-db")
+            .option(ConnectionFactoryOptions.USER, "anotheruser")
+            .option(ConnectionFactoryOptions.PASSWORD, "anotherpassword")
+            .build());
+    }
+}
+---------------------------------------------------------------------------
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+@Service
+public class DeviceService {
+
+    private final DeviceRepository deviceRepository;
+
+    @Autowired
+    public DeviceService(@Qualifier("r2dbcFactory1") DeviceRepository deviceRepository) {
+        this.deviceRepository = deviceRepository;
+    }
+
+    // Fetch a device by its ID
+    public Mono<Device> getDeviceById(Long id) {
+        return deviceRepository.findById(id);
+    }
+
+    // Save a new device
+    public Mono<Device> addDevice(Device device) {
+        return deviceRepository.save(device);
+    }
+
+    // Delete a device by its ID
+    public Mono<Void> deleteDevice(Long id) {
+        return deviceRepository.deleteById(id);
+    }
+
+    // Update an existing device
+    public Mono<Device> updateDevice(Long id, Device device) {
+        return deviceRepository.findById(id)
+                .flatMap(existingDevice -> {
+                    existingDevice.setName(device.getName());  // Updating the device's name
+                    return deviceRepository.save(existingDevice);
+                });
+    }
+}
