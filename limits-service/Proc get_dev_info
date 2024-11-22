@@ -1844,3 +1844,19 @@ feature_name
 feature_id (joined with im_eg_feat_attr_xref)
 im_eg_feat_attr_xref:
 equip_id (
+-------------------------------------------------------------------------
+declare
+v_result_set sys_refcursor;
+v_device_sku_list varchar2(100);
+v_eff_beg_dt date;
+v_data varchar2(32000);
+begin
+    v_device_sku_list := 'LG-VX4400BM';
+    v_eff_beg_dt := '19-APR-2024';
+    DMD_PKG_GEN_OMNI_FEED.sp_get_dev_info(v_device_sku_list, v_eff_beg_dt, v_result_set);
+    loop
+    fetch v_result_set into v_data;
+    exit when v_result_set%NOTFOUND;
+    dbms_output.put_line(v_data);
+    end loop;
+end;
