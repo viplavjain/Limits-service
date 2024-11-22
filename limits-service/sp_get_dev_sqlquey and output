@@ -1,0 +1,554 @@
+spring:
+  application:
+  name: federated-catalog-tools-ms
+
+  #r2dbc:
+   # url: r2dbc:oracle://sqa1posatgdb.ebiz.verizon.com:2055/posatgsqa1
+    #username: atgrep
+    #password: atgaws123
+
+federatedcatalog:
+  fusion:
+    api:
+      host:
+        SearchBySORId: api/solr/VZWBrowse/select?q=*&fq=sku_sor_id_s
+        qa1: http://wwwsearch-qa1-index.ebiz.verizon.com:8764/
+        qa2: http://wwwsearch-qa2-index.ebiz.verizon.com:8764/
+        qa3: http://wwwsearch-qa3-index.ebiz.verizon.com:8764/
+        qa4: http://wwwsearch-qa4-index.ebiz.verizon.com:8764/
+        qa5: http://wwwsearch-qa5-index.ebiz.verizon.com:8764/
+        qa6: http://wwwsearch-qa6-index.ebiz.verizon.com:8764/
+      username:
+        qa1: api-read
+        qa2: api-read
+        qa3: api-read
+        qa4: api-read
+        qa5: api-read
+        qa6: api-read
+      password:
+        qa1: wC0rT34gwC0rT25gwC0rT29gw789
+        qa2: wC0rT34gwC0rT25gwC0rT29gw789
+        qa3: wC0rT34gwC0rT25gwC0rT29gw789
+        qa4: wC0rT34gwC0rT25gwC0rT29gw789
+        qa5: wC0rT34gwC0rT25gwC0rT29gw789
+        qa6: wC0rT34gwC0rT25gwC0rT29gw789
+
+  cassandra:
+    api:
+      host:
+        qa1: https://cxp-b6vv-nssit11.ebiz.verizon.com/b6vv/nssit11/
+        qa2: https://cxp-b6vv-nssit22.ebiz.verizon.com/b6vv/nssit22/
+        qa3: https://cxp-b6vv-nssit11.ebiz.verizon.com/b6vv/nssit33/
+      header:
+        clientid: epc-internal
+        channelid: epc-internal
+
+  epc:
+    database:
+      url: r2dbc:oracle://sqa1posatgdb.ebiz.verizon.com:2055/posatgsqa1
+      username: atgrep
+      password: atgaws123
+
+
+logging:
+  level:
+     com.vzw: INFO
+  file:
+    name: federatedcatalog.log
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
+------------------------------------------------------------------------------------------------------
+Select XMLElement( "deviceInfo"
+                       , XMLForest( l.prod_name as "prodName"
+                                , l.device_family_name                        as "familyName"
+                                , l.mfg_code                                  as "mfgCode"
+								,XMLCDATA(COALESCE(od.manufacture_name,l.real_manufacturer,m.mfg_name)) as "mfgName"
+                                , Nvl(e.prod_type, ' ')                       as "prodType"
+                                , Nvl(ie.equip_name, ' ')                     as "imProdName"
+                                , Nvl(ie.main_image, ' ')                     as "imImageUrl"
+                                , Nvl(ie.Device_Category, ' ')                as "imDeviceCategory"
+                                , Nvl(d.device_mask, ' ')                     as "deviceType"
+                                , Nvl(f.global_phone, ' ')                    as "globalPhone"
+                                , Nvl(l.device_category, ' ')                 as "deviceCategory"
+                                , Nvl(t.dcat, ' ')                            as "deviceCapabilityInd"
+                                , Nvl(f.ba, ' ')                              as "backupAssistCapable"
+                                , ( Select nvl(max(sc.sim_sku), ' ')
+                                      from sim_4g_compatible_marketing sc
+                                     Where sc.preferred_sim  = 'Y'
+                                       And sc.prod_name      = l.prod_name
+                                       And sc.mfg_code       = l.mfg_code
+                                       And sc.effective_date = l.effective_date) as "preferredSim"
+                                ,( Select nvl(max(sc.sim_sku), ' ')
+                                      from sim_4g_compatible_marketing sc
+                                     Where sc.preferred_soft_sim  = 'Y'
+                                       And sc.prod_name      = l.prod_name
+                                       And sc.mfg_code       = l.mfg_code
+                                       And sc.effective_date = l.effective_date) as "preferredSoftSim",
+                                       ( Select nvl(max(sc.sim_sku), ' ')
+                                      from sim_4g_compatible_marketing sc
+                                     Where sc.alternate_sim  = 'Y'
+                                       And sc.prod_name      = l.prod_name
+                                       And sc.mfg_code       = l.mfg_code
+                                       And sc.effective_date = l.effective_date) as "alternateSim"
+                                , Nvl(ph.sim_class_4g, ' ')     as "simClass4G"
+                                , Nvl(f.nfc_capable, ' ')       as "nfcCapable"
+                                , Nvl(f.nfc_compatible, ' ')    as "nfcCompatible"
+                                , DECODE(f.mobile_messaging, '2WSMS/MO','Y', 'N') as "smsCapable"
+                                , (Select Nvl(Max(s.dacc_code), '00000') From sku_dacc s
+                                    Where s.prod_name  = l.prod_name
+                                      And s.mfg_code   = l.mfg_code
+                                      And s.effective_date = l.effective_date) as "dacc"
+                                , Nvl(l.device_family_type, ' ')       as "deviceFamilyType"
+                                , Nvl(l.buddy_upgrd_elig_ind, ' ')     as "buddyUpgrdEligInd"
+                                , Nvl(l.restrict_to_family_ind, ' ')   as "restrictToFamilyInd"
+                                , Nvl(f.hd_voice, ' ')                 as "hdVoice"
+                                , Nvl(t.coverage_check_4g, ' ')        as "coverageCheck4G"
+                                , Nvl(t.volte_4_business, ' ')         as "v4b"
+                                , Nvl(t.number_share_capability, ' ')  as "numberShareCapable"
+                                , Nvl(f.euicc_capable, ' ')  as "euiccCapable"
+                                , Nvl(f.esim_only_ind, ' ')  as "esimOnlyInd"
+                                , Nvl(f.vendor_key, ' ')  as "vendorKey"
+                                , Nvl(f.dsds, ' ') as "dsds"
+                                , Nvl((Select os_type From software s
+                                    Where s.prod_name  = l.prod_name
+                                      And s.mfg_code   = l.mfg_code
+                                      And s.effective_date = l.effective_date), ' ') as "operatingSystem"
+                                , Nvl((Select max(eligible_num_share_os) From DMD_UNIVERSAL_API_DATA api
+                                    Where api.prod_name  = l.prod_name
+                                      And api.mfg_code   = l.mfg_code
+                                      And api.effective_date = l.effective_date), ' ') as "eligibleNumShareOS"
+                                , ( Select decode(count(*), 0, 'N', 'Y')
+                                      From im_eg_accessory ai, launch_package li, im_eg_acc_xref xi
+                                     Where ai.mnfr_id = 0
+                                       And ai.universal_type in (select distinct universal_type from im_eg_accessory)
+                                       And ai.universal_type    <> 'None'
+                                       And li.device_family_name = l.device_family_name
+                                       And xi.equip_id           = li.equip_id
+                                       And xi.acc_id             = ai.acc_id) as "universalDevice"
+                                , Nvl(f.wifi_calling, ' ')        as "wifiCalling"
+                                , Nvl(f.E911_ADDR_IND, ' ')        as "e911AddrInd"
+                                , Case When ie.equip_id Is Null Then
+                                        ' '
+                                  Else Nvl((Select distinct 'N' From im_eg_feat_attr_xref x
+                                        Where x.equip_id = ie.equip_id and x.feature_id  = '1744'), 'Y') End as "cdmaCapableInd"
+                                , Case When d.device_mask like '4G%' Then
+                                       'Y'
+                                       When ie.equip_id Is Null Then
+                                       ' '
+                                  Else Nvl((Select distinct 'Y' From im_eg_feat_attr_xref x
+                                        Where x.equip_id = ie.equip_id and x.feature_id  In ('1773', '915')), 'N') end as "gsmCapableInd"
+										--BQVT-957
+                                , Nvl(l.device_carrier, ' ')        as "deviceCarrier"
+                                , Nvl((select to_char(POSTPAID_RESTRICT_START_DATE,'MM/DD/YYYY') from restrict_devices where device_sku = l.dymax_bam),' ') as "postpaidRestrictStartDate"
+                                , Nvl((select to_char(PREPAY_RESTRICT_START_DATE,'MM/DD/YYYY') from restrict_devices where device_sku = l.dymax_bam),' ') as "prepayRestrictStartDate"
+                                )
+                                , XMLElement("universalPropCdList"
+                                                , (Select XMLAgg(XMLElement("universalPropCd", iv.vzw_model))
+                                                     From ( Select distinct li.device_family_name, ai.vzw_model
+                                                              From im_eg_accessory ai, launch_package li, im_eg_acc_xref xi
+                                                             Where ai.mnfr_id = 0
+                                                               And ai.universal_type    In (select distinct universal_type from im_eg_accessory)
+                                                               And ai.universal_type    <> 'None'
+                                                               And xi.equip_id           = li.equip_id
+                                                               And xi.acc_id             = ai.acc_id) iv
+                                                     Where iv.device_family_name = l.device_family_name))
+                                , XMLElement("deviceSkuList"
+                                                , (Select XMLAgg(
+                                                            XMLElement("deviceSkuInfo"
+                                                                , XMLForest( s.sku_code                    as "deviceSku"
+                                                                           , Nvl(sim_model_id, ' ')        as "virtualSimSku"
+                                                                           , DMD_PKG_GEN_OMNI_FEED.f_get_sku_type(s.sku_code)    as "skuType"
+                                                                           , i.itm_class1                  as "prodCode1"
+                                                                           , i.itm_class2                  as "prodCode2"
+                                                                           , i.itm_class3                  as "prodCode3"
+                                                                           , i.itm_class4                  as "prodCode4"
+                                                                           , i.itm_class5                  as "prodCode5"
+                                                                           , Nvl(i.itm_bta_eligible, ' ')  as "btaEligiblity"
+                                                                           , Nvl(i.itm_upc, ' ')           as "upcCode"
+                                                                           , Nvl(i.itm_prepay_sku, 'N')    as "prepaySkuInd"
+                                                                           , Nvl(i.itm_wave_eligible, ' ') as "edgeEligibleInd"
+                                                                           , Nvl(i.itm_dpc_group, ' ')     as "edgeDpcGroup"
+                                                                           , Nvl(i.itm_dpc_item, ' ')      as "edgeDpcItem"
+                                                                           , i.itm_last_cost               as "itemCost"
+                                                                           , (Select Nvl(to_char(max(i.equip_id)), ' ')
+                                                                                From im_eg_equipment i
+                                                                               Where i.inventory_id  = s.sku_code
+                                                                                 And i.delete_flag   <> 'Y')     as "imEquipID"
+                                                                           , Nvl(i.itm_upc_full, ' ')            as "upcCodeFull"
+                                                                           , i.itm_device_cap                    as "edgeDeviceCap"
+                                                                           , Nvl(i.instant_credit_eligible, ' ') as "instantCredit"
+                                                                           , Nvl(Decode(i.ispu_eligible, 'X', 'Y', i.ispu_eligible), ' ') as "ispuEligible"
+                                                                           , (Select Nvl(REPLACE(REPLACE(max(i.prop65_warning),CHR(10),' '),CHR(13),' '),' ')
+                                                                                  From im_eg_equipment i
+                                                                                  Where i.inventory_id  = s.sku_code
+                                                                                  And i.delete_flag   <> 'Y')  as "prop65"
+                                                                           )
+                                                                           ,  XMLElement("pairedSkuInfo"
+                                                                               , (Select XMLAgg( XMLElement("pairedImeiSku", imei2_sku))
+                                                                                 from sku_pair where imei1_sku=s.sku_code
+                                                                             ))))
+                                                     From sku_dacc s, item i, model_product mp
+                                                    Where s.sku_code       = i.itm_part
+                                                      And mp.model_id(+)   = s.sku_code
+                                                      And s.prod_name      = l.prod_name
+                                                      And s.mfg_code       = l.mfg_code
+                                                      And s.effective_date = l.effective_date
+                                                      ))
+                                , XMLElement("imFeatureNameList"
+                                                 , (Select XMLAgg( XMLElement("imFeatureName", feature_name))
+                                                      From ( Select distinct b.feature_name, a.inventory_id, a.equip_id
+                                                               From im_eg_equipment a, im_eg_feature_attr b, im_eg_feat_attr_xref c
+                                                              Where a.retired       = 'N'
+                                                                And a.active_flag   = 'Y'
+                                                                And a.delete_flag   = 'N'
+                                                                And a.equip_id      = c.equip_id
+                                                                And b.compare_flag  = 'Y'
+                                                                And b.feature_id    = c.feature_id) iv
+                                                     Where iv.equip_id = ie.equip_id ))
+                                , XMLElement("marketingCompatibleSimSkuList"
+                                                 , (Select XMLAgg( XMLElement("simSku", sku_code))
+                                                      From sku_dacc s, device_sim_compatibility dc
+                                                         , (Select prod_name, mfg_code, effective_date, max(dacc_code) dacc_code
+                                                              From sku_dacc
+                                                             Group By prod_name, mfg_code, effective_date) s2
+                                                     Where dc.dacc           = s2.dacc_code
+                                                       And s2.prod_name      = l.prod_name
+                                                       And s2.mfg_code       = l.mfg_code
+                                                       And s2.effective_date = l.effective_date
+                                                       And s.dacc_code       = dc.sacc))
+                              ).getClobVal() deviceInfoList
+              From launch_package l, manufacturer m, equipment_model e, im_eg_equipment ie, features f, (select distinct PROD_MODEL_NAME,MANUFACTURE_NAME from OD_DATA_LOAD) od
+                 , device_mask d, technology t, physical_attributes ph, 
+               (Select distinct prod_name
+                From sku_dacc o
+                where o.sku_code = 'LG-VX4400BM'--p_sku_id
+                And Not Exists (Select 1 From dmd_universal_api_data d
+                                Where d.device_sku   = o.sku_code
+                                  And d.device_mask In ('4GS', '4GK','5GM','5GS'))) inp
+             Where (l.display_ind is null Or trim(upper(l.display_ind)) <> 'N' Or l.bcc_ind = 'Y')
+               And l.prod_name          = inp.prod_name
+               And m.mfg_code(+)        = l.mfg_code
+               And od.prod_model_name(+)= l.prod_name
+               And e.prod_name          = l.prod_name
+               And e.mfg_code           = l.mfg_code
+               And e.effective_date     = l.effective_date
+               And f.prod_name          = l.prod_name
+               And f.mfg_code           = l.mfg_code
+               And f.effective_date     = l.effective_date
+               And f.device_mask_id     = d.device_mask_id(+)
+               And t.prod_name(+)       = l.prod_name
+               And t.mfg_code(+)        = l.mfg_code
+               And t.effective_date(+)  = l.effective_date
+               And ph.prod_name(+)      = l.prod_name
+               And ph.mfg_code(+)       = l.mfg_code
+               And ph.effective_date(+) = l.effective_date
+               And ie.equip_id(+)       = l.equip_id;
+---------------------------------------------------------------------------------------------------------------
+output of sql query
+----output of 
+<deviceInfo>
+	<prodName>LG-VX4400</prodName>
+	<familyName>LG-VX4400</familyName>
+	<mfgCode>LGI</mfgCode>
+	<mfgName>
+		<![CDATA[LG]]>
+	</mfgName>
+	<prodType>Phone</prodType>
+	<imProdName>VX4400</imProdName>
+	<imImageUrl>https://infomanager.verizon.com/EQUIPMENT_GUIDE/equipment_guide/images/VX4400.gif</imImageUrl>
+	<imDeviceCategory>Basic Phones</imDeviceCategory>
+	<deviceType></deviceType>
+	<globalPhone>N</globalPhone>
+	<deviceCategory>Feature Phones</deviceCategory>
+	<deviceCapabilityInd>VD</deviceCapabilityInd>
+	<backupAssistCapable>Y</backupAssistCapable>
+	<preferredSim></preferredSim>
+	<preferredSoftSim></preferredSoftSim>
+	<alternateSim></alternateSim>
+	<simClass4G></simClass4G>
+	<nfcCapable></nfcCapable>
+	<nfcCompatible></nfcCompatible>
+	<smsCapable>Y</smsCapable>
+	<dacc>00119</dacc>
+	<deviceFamilyType>Phone</deviceFamilyType>
+	<buddyUpgrdEligInd>Y</buddyUpgrdEligInd>
+	<restrictToFamilyInd>N</restrictToFamilyInd>
+	<hdVoice></hdVoice>
+	<coverageCheck4G></coverageCheck4G>
+	<v4b></v4b>
+	<numberShareCapable></numberShareCapable>
+	<euiccCapable></euiccCapable>
+	<esimOnlyInd></esimOnlyInd>
+	<vendorKey></vendorKey>
+	<dsds></dsds>
+	<operatingSystem>N/A</operatingSystem>
+	<eligibleNumShareOS></eligibleNumShareOS>
+	<universalDevice>Y</universalDevice>
+	<wifiCalling>N</wifiCalling>
+	<e911AddrInd></e911AddrInd>
+	<cdmaCapableInd>Y</cdmaCapableInd>
+	<gsmCapableInd>N</gsmCapableInd>
+	<deviceCarrier>Verizon</deviceCarrier>
+	<postpaidRestrictStartDate>07/01/2018</postpaidRestrictStartDate>
+	<prepayRestrictStartDate>05/01/2019</prepayRestrictStartDate>
+	<universalPropCdList>
+		<universalPropCd>Universal CS</universalPropCd>
+		<universalPropCd>Universal HF</universalPropCd>
+		<universalPropCd>Universal Other</universalPropCd>
+	</universalPropCdList>
+	<deviceSkuList>
+		<deviceSkuInfo>
+			<deviceSku>FRULGVX4400</deviceSku>
+			<virtualSimSku></virtualSimSku>
+			<skuType>CLNR</skuType>
+			<prodCode1>PHO</prodCode1>
+			<prodCode2>POR</prodCode2>
+			<prodCode3>DIG</prodCode3>
+			<prodCode4>TRI</prodCode4>
+			<prodCode5>FRU</prodCode5>
+			<btaEligiblity></btaEligiblity>
+			<upcCode></upcCode>
+			<prepaySkuInd>N</prepaySkuInd>
+			<edgeEligibleInd>N</edgeEligibleInd>
+			<edgeDpcGroup>0000</edgeDpcGroup>
+			<edgeDpcItem>000</edgeDpcItem>
+			<imEquipID></imEquipID>
+			<upcCodeFull></upcCodeFull>
+			<edgeDeviceCap>0</edgeDeviceCap>
+			<instantCredit></instantCredit>
+			<ispuEligible></ispuEligible>
+			<prop65></prop65>
+			<pairedSkuInfo></pairedSkuInfo>
+		</deviceSkuInfo>
+		<deviceSkuInfo>
+			<deviceSku>LG-VX4400BM</deviceSku>
+			<virtualSimSku></virtualSimSku>
+			<skuType>CLNR</skuType>
+			<prodCode1>PHO</prodCode1>
+			<prodCode2>POR</prodCode2>
+			<prodCode3>000</prodCode3>
+			<prodCode4>000</prodCode4>
+			<prodCode5>FRU</prodCode5>
+			<btaEligiblity>N</btaEligiblity>
+			<upcCode></upcCode>
+			<prepaySkuInd>N</prepaySkuInd>
+			<edgeEligibleInd>N</edgeEligibleInd>
+			<edgeDpcGroup>0000</edgeDpcGroup>
+			<edgeDpcItem>000</edgeDpcItem>
+			<imEquipID>192</imEquipID>
+			<upcCodeFull></upcCodeFull>
+			<edgeDeviceCap>0</edgeDeviceCap>
+			<instantCredit></instantCredit>
+			<ispuEligible></ispuEligible>
+			<prop65></prop65>
+			<pairedSkuInfo></pairedSkuInfo>
+		</deviceSkuInfo>
+	</deviceSkuList>
+	<imFeatureNameList></imFeatureNameList>
+	<marketingCompatibleSimSkuList></marketingCompatibleSimSkuList>
+</deviceInfo>
+<deviceInfo>
+	<prodName>LG-VX4600</prodName>
+	<familyName>LG-VX4600</familyName>
+	<mfgCode>LGI</mfgCode>
+	<mfgName>
+		<![CDATA[LG]]>
+	</mfgName>
+	<prodType>Phone</prodType>
+	<imProdName>VX4600</imProdName>
+	<imImageUrl>https://infomanager.verizon.com/EQUIPMENT_GUIDE/equipment_guide/images/VX4600.gif</imImageUrl>
+	<imDeviceCategory>Basic Phones</imDeviceCategory>
+	<deviceType></deviceType>
+	<globalPhone>N</globalPhone>
+	<deviceCategory>Feature Phones</deviceCategory>
+	<deviceCapabilityInd>VD</deviceCapabilityInd>
+	<backupAssistCapable>Y</backupAssistCapable>
+	<preferredSim></preferredSim>
+	<preferredSoftSim></preferredSoftSim>
+	<alternateSim></alternateSim>
+	<simClass4G></simClass4G>
+	<nfcCapable></nfcCapable>
+	<nfcCompatible></nfcCompatible>
+	<smsCapable>Y</smsCapable>
+	<dacc>00107</dacc>
+	<deviceFamilyType>Phone</deviceFamilyType>
+	<buddyUpgrdEligInd>Y</buddyUpgrdEligInd>
+	<restrictToFamilyInd>N</restrictToFamilyInd>
+	<hdVoice></hdVoice>
+	<coverageCheck4G></coverageCheck4G>
+	<v4b></v4b>
+	<numberShareCapable></numberShareCapable>
+	<euiccCapable></euiccCapable>
+	<esimOnlyInd></esimOnlyInd>
+	<vendorKey></vendorKey>
+	<dsds></dsds>
+	<operatingSystem>N/A</operatingSystem>
+	<eligibleNumShareOS></eligibleNumShareOS>
+	<universalDevice>Y</universalDevice>
+	<wifiCalling>N</wifiCalling>
+	<e911AddrInd></e911AddrInd>
+	<cdmaCapableInd>Y</cdmaCapableInd>
+	<gsmCapableInd>N</gsmCapableInd>
+	<deviceCarrier>Verizon</deviceCarrier>
+	<postpaidRestrictStartDate>07/01/2018</postpaidRestrictStartDate>
+	<prepayRestrictStartDate>05/01/2019</prepayRestrictStartDate>
+	<universalPropCdList>
+		<universalPropCd>Universal CS</universalPropCd>
+		<universalPropCd>Universal HF</universalPropCd>
+		<universalPropCd>Universal Other</universalPropCd>
+	</universalPropCdList>
+	<deviceSkuList>
+		<deviceSkuInfo>
+			<deviceSku>LG-VX4400BM</deviceSku>
+			<virtualSimSku></virtualSimSku>
+			<skuType>CLNR</skuType>
+			<prodCode1>PHO</prodCode1>
+			<prodCode2>POR</prodCode2>
+			<prodCode3>000</prodCode3>
+			<prodCode4>000</prodCode4>
+			<prodCode5>FRU</prodCode5>
+			<btaEligiblity>N</btaEligiblity>
+			<upcCode></upcCode>
+			<prepaySkuInd>N</prepaySkuInd>
+			<edgeEligibleInd>N</edgeEligibleInd>
+			<edgeDpcGroup>0000</edgeDpcGroup>
+			<edgeDpcItem>000</edgeDpcItem>
+			<imEquipID>192</imEquipID>
+			<upcCodeFull></upcCodeFull>
+			<edgeDeviceCap>0</edgeDeviceCap>
+			<instantCredit></instantCredit>
+			<ispuEligible></ispuEligible>
+			<prop65></prop65>
+			<pairedSkuInfo></pairedSkuInfo>
+		</deviceSkuInfo>
+		<deviceSkuInfo>
+			<deviceSku>FRULGVX4600</deviceSku>
+			<virtualSimSku></virtualSimSku>
+			<skuType>CLNR</skuType>
+			<prodCode1>PHO</prodCode1>
+			<prodCode2>POR</prodCode2>
+			<prodCode3>DIG</prodCode3>
+			<prodCode4>DUB</prodCode4>
+			<prodCode5>FRU</prodCode5>
+			<btaEligiblity></btaEligiblity>
+			<upcCode></upcCode>
+			<prepaySkuInd>N</prepaySkuInd>
+			<edgeEligibleInd>N</edgeEligibleInd>
+			<edgeDpcGroup>0000</edgeDpcGroup>
+			<edgeDpcItem>000</edgeDpcItem>
+			<imEquipID></imEquipID>
+			<upcCodeFull></upcCodeFull>
+			<edgeDeviceCap>0</edgeDeviceCap>
+			<instantCredit></instantCredit>
+			<ispuEligible></ispuEligible>
+			<prop65></prop65>
+			<pairedSkuInfo></pairedSkuInfo>
+		</deviceSkuInfo>
+		<deviceSkuInfo>
+			<deviceSku>LG-VX4600</deviceSku>
+			<virtualSimSku></virtualSimSku>
+			<skuType>CLNR</skuType>
+			<prodCode1>PHO</prodCode1>
+			<prodCode2>POR</prodCode2>
+			<prodCode3>000</prodCode3>
+			<prodCode4>000</prodCode4>
+			<prodCode5>FRU</prodCode5>
+			<btaEligiblity>N</btaEligiblity>
+			<upcCode></upcCode>
+			<prepaySkuInd>N</prepaySkuInd>
+			<edgeEligibleInd>N</edgeEligibleInd>
+			<edgeDpcGroup>0000</edgeDpcGroup>
+			<edgeDpcItem>000</edgeDpcItem>
+			<imEquipID>1544</imEquipID>
+			<upcCodeFull></upcCodeFull>
+			<edgeDeviceCap>0</edgeDeviceCap>
+			<instantCredit></instantCredit>
+			<ispuEligible>Y</ispuEligible>
+			<prop65></prop65>
+			<pairedSkuInfo></pairedSkuInfo>
+		</deviceSkuInfo>
+	</deviceSkuList>
+	<imFeatureNameList></imFeatureNameList>
+	<marketingCompatibleSimSkuList></marketingCompatibleSimSkuList>
+</deviceInfo>
+<deviceInfo>
+	<prodName>LG-VX4400</prodName>
+	<familyName>LG-VX4400</familyName>
+	<mfgCode>LGI</mfgCode>
+	<mfgName>
+		<![CDATA[LG]]>
+	</mfgName>
+	<prodType>Phone</prodType>
+	<imProdName>VX4400</imProdName>
+	<imImageUrl>https://infomanager.verizon.com/EQUIPMENT_GUIDE/equipment_guide/images/VX4400.gif</imImageUrl>
+	<imDeviceCategory>Basic Phones</imDeviceCategory>
+	<deviceType></deviceType>
+	<globalPhone>N</globalPhone>
+	<deviceCategory>Feature Phones</deviceCategory>
+	<deviceCapabilityInd>VD</deviceCapabilityInd>
+	<backupAssistCapable>Y</backupAssistCapable>
+	<preferredSim></preferredSim>
+	<preferredSoftSim></preferredSoftSim>
+	<alternateSim></alternateSim>
+	<simClass4G></simClass4G>
+	<nfcCapable></nfcCapable>
+	<nfcCompatible></nfcCompatible>
+	<smsCapable>Y</smsCapable>
+	<dacc>00119</dacc>
+	<deviceFamilyType>Phone</deviceFamilyType>
+	<buddyUpgrdEligInd>Y</buddyUpgrdEligInd>
+	<restrictToFamilyInd>N</restrictToFamilyInd>
+	<hdVoice></hdVoice>
+	<coverageCheck4G></coverageCheck4G>
+	<v4b></v4b>
+	<numberShareCapable></numberShareCapable>
+	<euiccCapable></euiccCapable>
+	<esimOnlyInd></esimOnlyInd>
+	<vendorKey></vendorKey>
+	<dsds></dsds>
+	<operatingSystem>N/A</operatingSystem>
+	<eligibleNumShareOS></eligibleNumShareOS>
+	<universalDevice>Y</universalDevice>
+	<wifiCalling>N</wifiCalling>
+	<e911AddrInd></e911AddrInd>
+	<cdmaCapableInd>Y</cdmaCapableInd>
+	<gsmCapableInd>N</gsmCapableInd>
+	<deviceCarrier>Verizon</deviceCarrier>
+	<postpaidRestrictStartDate>07/01/2018</postpaidRestrictStartDate>
+	<prepayRestrictStartDate>05/01/2019</prepayRestrictStartDate>
+	<universalPropCdList>
+		<universalPropCd>Universal CS</universalPropCd>
+		<universalPropCd>Universal HF</universalPropCd>
+		<universalPropCd>Universal Other</universalPropCd>
+	</universalPropCdList>
+	<deviceSkuList>
+		<deviceSkuInfo>
+			<deviceSku>LG-VX4400BM</deviceSku>
+			<virtualSimSku></virtualSimSku>
+			<skuType>CLNR</skuType>
+			<prodCode1>PHO</prodCode1>
+			<prodCode2>POR</prodCode2>
+			<prodCode3>000</prodCode3>
+			<prodCode4>000</prodCode4>
+			<prodCode5>FRU</prodCode5>
+			<btaEligiblity>N</btaEligiblity>
+			<upcCode></upcCode>
+			<prepaySkuInd>N</prepaySkuInd>
+			<edgeEligibleInd>N</edgeEligibleInd>
+			<edgeDpcGroup>0000</edgeDpcGroup>
+			<edgeDpcItem>000</edgeDpcItem>
+			<imEquipID>192</imEquipID>
+			<upcCodeFull></upcCodeFull>
+			<edgeDeviceCap>0</edgeDeviceCap>
+			<instantCredit></instantCredit>
+			<ispuEligible></ispuEligible>
+			<prop65></prop65>
+			<pairedSkuInfo></pairedSkuInfo>
+		</deviceSkuInfo>
+	</deviceSkuList>
+	<imFeatureNameList></imFeatureNameList>
+	<marketingCompatibleSimSkuList></marketingCompatibleSimSkuList>
+</deviceInfo>
+
+
+
