@@ -75,3 +75,135 @@ public class DeviceService {
 }
 -------------------------------------------------------------------
 <deviceInfo><prodName>LG-VX4400</prodName><familyName>LG-VX4400</familyName><mfgCode>LGI</mfgCode><mfgName><![CDATA[LG]]></mfgName><prodType>Phone</prodType><imProdName>VX4400</imProdName><imImageUrl>https://infomanager.verizon.com/EQUIPMENT_GUIDE/equipment_guide/images/VX4400.gif</imImageUrl><imDeviceCategory>Basic Phones</imDeviceCategory><deviceType> </deviceType><globalPhone>N</globalPhone><deviceCategory>Feature Phones</deviceCategory><deviceCapabilityInd>VD</deviceCapabilityInd><backupAssistCapable>Y</backupAssistCapable><preferredSim> </preferredSim><preferredSoftSim> </preferredSoftSim><alternateSim> </alternateSim><simClass4G> </simClass4G><nfcCapable> </nfcCapable><nfcCompatible> </nfcCompatible><smsCapable>Y</smsCapable><dacc>00119</dacc><deviceFamilyType>Phone</deviceFamilyType><buddyUpgrdEligInd>Y</buddyUpgrdEligInd><restrictToFamilyInd>N</restrictToFamilyInd><hdVoice> </hdVoice><coverageCheck4G> </coverageCheck4G><v4b> </v4b><numberShareCapable> </numberShareCapable><euiccCapable> </euiccCapable><esimOnlyInd> </esimOnlyInd><vendorKey> </vendorKey><dsds> </dsds><operatingSystem>N/A</operatingSystem><eligibleNumShareOS> </eligibleNumShareOS><universalDevice>Y</universalDevice><wifiCalling>N</wifiCalling><e911AddrInd> </e911AddrInd><cdmaCapableInd>Y</cdmaCapableInd><gsmCapableInd>N</gsmCapableInd><deviceCarrier>Verizon</deviceCarrier><postpaidRestrictStartDate>07/01/2018</postpaidRestrictStartDate><prepayRestrictStartDate>05/01/2019</prepayRestrictStartDate><universalPropCdList><universalPropCd>Universal CS</universalPropCd><universalPropCd>Universal HF</universalPropCd><universalPropCd>Universal Other</universalPropCd></universalPropCdList><deviceSkuList><deviceSkuInfo><deviceSku>LG-VX4400BM</deviceSku><virtualSimSku> </virtualSimSku><skuType>CLNR</skuType><prodCode1>PHO</prodCode1><prodCode2>POR</prodCode2><prodCode3>000</prodCode3><prodCode4>000</prodCode4><prodCode5>FRU</prodCode5><btaEligiblity>N</btaEligiblity><upcCode> </upcCode><prepaySkuInd>N</prepaySkuInd><edgeEligibleInd>N</edgeEligibleInd><edgeDpcGroup>0000</edgeDpcGroup><edgeDpcItem>000</edgeDpcItem><imEquipID>192</imEquipID><upcCodeFull> </upcCodeFull><edgeDeviceCap>0</edgeDeviceCap><instantCredit> </instantCredit><ispuEligible> </ispuEligible><prop65> </prop65><pairedSkuInfo></pairedSkuInfo></deviceSkuInfo></deviceSkuList><imFeatureNameList></imFeatureNameList><marketingCompatibleSimSkuList></marketingCompatibleSimSkuList></deviceInfo><deviceInfo><prodName>LG-VX4400</prodName><familyName>LG-VX4400</familyName><mfgCode>LGI</mfgCode><mfgName><![CDATA[LG]]></mfgName><prodType>Phone</prodType><imProdName>VX4400</imProdName><imImageUrl>https://infomanager.verizon.com/EQUIPMENT_GUIDE/equipment_guide/images/VX4400.gif</imImageUrl><imDeviceCategory>Basic Phones</imDeviceCategory><deviceType> </deviceType><globalPhone>N</globalPhone><deviceCategory>Feature Phones</deviceCategory><deviceCapabilityInd>VD</deviceCapabilityInd><backupAssistCapable>Y</backupAssistCapable><preferredSim> </preferredSim><preferredSoftSim> </preferredSoftSim><alternateSim> </alternateSim><simClass4G> </simClass4G><nfcCapable> </nfcCapable><nfcCompatible> </nfcCompatible><smsCapable>Y</smsCapable><dacc>00119</dacc><deviceFamilyType>Phone</deviceFamilyType><buddyUpgrdEligInd>Y</buddyUpgrdEligInd><restrictToFamilyInd>N</restrictToFamilyInd><hdVoice> </hdVoice><coverageCheck4G> </coverageCheck4G><v4b> </v4b><numberShareCapable> </numberShareCapable><euiccCapable> </euiccCapable><esimOnlyInd> </esimOnlyInd><vendorKey> </vendorKey><dsds> </dsds><operatingSystem>N/A</operatingSystem><eligibleNumShareOS> </eligibleNumShareOS><universalDevice>Y</universalDevice><wifiCalling>N</wifiCalling><e911AddrInd> </e911AddrInd><cdmaCapableInd>Y</cdmaCapableInd><gsmCapableInd>N</gsmCapableInd><deviceCarrier>Verizon</deviceCarrier><postpaidRestrictStartDate>07/01/2018</postpaidRestrictStartDate><prepayRestrictStartDate>05/01/2019</prepayRestrictStartDate><universalPropCdList><universalPropCd>Universal CS</universalPropCd><universalPropCd>Universal HF</universalPropCd><universalPropCd>Universal Other</universalPropCd></universalPropCdList><deviceSkuList><deviceSkuInfo><deviceSku>FRULGVX4400</deviceSku><virtualSimSku> </virtualSimSku><skuType>CLNR</skuType><prodCode1>PHO</prodCode1><prodCode2>POR</prodCode2><prodCode3>DIG</prodCode3><prodCode4>TRI</prodCode4><prodCode5>FRU</prodCode5><btaEligiblity> </btaEligiblity><upcCode> </upcCode><prepaySkuInd>N</prepaySkuInd><edgeEligibleInd>N</edgeEligibleInd><edgeDpcGroup>0000</edgeDpcGroup><edgeDpcItem>000</edgeDpcItem><imEquipID> </imEquipID><upcCodeFull> </upcCodeFull><edgeDeviceCap>0</edgeDeviceCap><instantCredit> </instantCredit><ispuEligible> </ispuEligible><prop65> </prop65><pairedSkuInfo></pairedSkuInfo></deviceSkuInfo><deviceSkuInfo><deviceSku>LG-VX4400BM</deviceSku><virtualSimSku> </virtualSimSku><skuType>CLNR</skuType><prodCode1>PHO</prodCode1><prodCode2>POR</prodCode2><prodCode3>000</prodCode3><prodCode4>000</prodCode4><prodCode5>FRU</prodCode5><btaEligiblity>N</btaEligiblity><upcCode> </upcCode><prepaySkuInd>N</prepaySkuInd><edgeEligibleInd>N</edgeEligibleInd><edgeDpcGroup>0000</edgeDpcGroup><edgeDpcItem>000</edgeDpcItem><imEquipID>192</imEquipID><upcCodeFull> </upcCodeFull><edgeDeviceCap>0</edgeDeviceCap><instantCredit> </instantCredit><ispuEligible> </ispuEligible><prop65> </prop65><pairedSkuInfo></pairedSkuInfo></deviceSkuInfo></deviceSkuList><imFeatureNameList></imFeatureNameList><marketingCompatibleSimSkuList></marketingCompatibleSimSkuList></deviceInfo><deviceInfo><prodName>LG-VX4600</prodName><familyName>LG-VX4600</familyName><mfgCode>LGI</mfgCode><mfgName><![CDATA[LG]]></mfgName><prodType>Phone</prodType><imProdName>VX4600</imProdName><imImageUrl>https://infomanager.verizon.com/EQUIPMENT_GUIDE/equipment_guide/images/VX4600.gif</imImageUrl><imDeviceCategory>Basic Phones</imDeviceCategory><deviceType> </deviceType><globalPhone>N</globalPhone><deviceCategory>Feature Phones</deviceCategory><deviceCapabilityInd>VD</deviceCapabilityInd><backupAssistCapable>Y</backupAssistCapable><preferredSim> </preferredSim><preferredSoftSim> </preferredSoftSim><alternateSim> </alternateSim><simClass4G> </simClass4G><nfcCapable> </nfcCapable><nfcCompatible> </nfcCompatible><smsCapable>Y</smsCapable><dacc>00107</dacc><deviceFamilyType>Phone</deviceFamilyType><buddyUpgrdEligInd>Y</buddyUpgrdEligInd><restrictToFamilyInd>N</restrictToFamilyInd><hdVoice> </hdVoice><coverageCheck4G> </coverageCheck4G><v4b> </v4b><numberShareCapable> </numberShareCapable><euiccCapable> </euiccCapable><esimOnlyInd> </esimOnlyInd><vendorKey> </vendorKey><dsds> </dsds><operatingSystem>N/A</operatingSystem><eligibleNumShareOS> </eligibleNumShareOS><universalDevice>Y</universalDevice><wifiCalling>N</wifiCalling><e911AddrInd> </e911AddrInd><cdmaCapableInd>Y</cdmaCapableInd><gsmCapableInd>N</gsmCapableInd><deviceCarrier>Verizon</deviceCarrier><postpaidRestrictStartDate>07/01/2018</postpaidRestrictStartDate><prepayRestrictStartDate>05/01/2019</prepayRestrictStartDate><universalPropCdList><universalPropCd>Universal CS</universalPropCd><universalPropCd>Universal HF</universalPropCd><universalPropCd>Universal Other</universalPropCd></universalPropCdList><deviceSkuList><deviceSkuInfo><deviceSku>LG-VX4400BM</deviceSku><virtualSimSku> </virtualSimSku><skuType>CLNR</skuType><prodCode1>PHO</prodCode1><prodCode2>POR</prodCode2><prodCode3>000</prodCode3><prodCode4>000</prodCode4><prodCode5>FRU</prodCode5><btaEligiblity>N</btaEligiblity><upcCode> </upcCode><prepaySkuInd>N</prepaySkuInd><edgeEligibleInd>N</edgeEligibleInd><edgeDpcGroup>0000</edgeDpcGroup><edgeDpcItem>000</edgeDpcItem><imEquipID>192</imEquipID><upcCodeFull> </upcCodeFull><edgeDeviceCap>0</edgeDeviceCap><instantCredit> </instantCredit><ispuEligible> </ispuEligible><prop65> </prop65><pairedSkuInfo></pairedSkuInfo></deviceSkuInfo><deviceSkuInfo><deviceSku>FRULGVX4600</deviceSku><virtualSimSku> </virtualSimSku><skuType>CLNR</skuType><prodCode1>PHO</prodCode1><prodCode2>POR</prodCode2><prodCode3>DIG</prodCode3><prodCode4>DUB</prodCode4><prodCode5>FRU</prodCode5><btaEligiblity> </btaEligiblity><upcCode> </upcCode><prepaySkuInd>N</prepaySkuInd><edgeEligibleInd>N</edgeEligibleInd><edgeDpcGroup>0000</edgeDpcGroup><edgeDpcItem>000</edgeDpcItem><imEquipID> </imEquipID><upcCodeFull> </upcCodeFull><edgeDeviceCap>0</edgeDeviceCap><instantCredit> </instantCredit><ispuEligible> </ispuEligible><prop65> </prop65><pairedSkuInfo></pairedSkuInfo></deviceSkuInfo><deviceSkuInfo><deviceSku>LG-VX4600</deviceSku><virtualSimSku> </virtualSimSku><skuType>CLNR</skuType><prodCode1>PHO</prodCode1><prodCode2>POR</prodCode2><prodCode3>000</prodCode3><prodCode4>000</prodCode4><prodCode5>FRU</prodCode5><btaEligiblity>N</btaEligiblity><upcCode> </upcCode><prepaySkuInd>N</prepaySkuInd><edgeEligibleInd>N</edgeEligibleInd><edgeDpcGroup>0000</edgeDpcGroup><edgeDpcItem>000</edgeDpcItem><imEquipID>1544</imEquipID><upcCodeFull> </upcCodeFull><edgeDeviceCap>0</edgeDeviceCap><instantCredit> </instantCredit><ispuEligible>Y</ispuEligible><prop65> </prop65><pairedSkuInfo></pairedSkuInfo></deviceSkuInfo></deviceSkuList><imFeatureNameList></imFeatureNameList><marketingCompatibleSimSkuList></marketingCompatibleSimSkuList></deviceInfo>
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+
+@Service
+public class DeviceService {
+
+    private final XmlMapper xmlMapper;
+
+    public DeviceService() {
+        this.xmlMapper = new XmlMapper();
+    }
+
+    /**
+     * Converts a Flux of XML strings to Flux of DeviceInfo objects
+     *
+     * @param xmlFlux Flux<String> containing XML data
+     * @return Flux<DeviceInfo>
+     */
+    public Flux<DeviceInfo> parseXmlToDeviceInfo(Flux<String> xmlFlux) {
+        return xmlFlux.flatMap(xml -> {
+            try {
+                // Convert XML string to DeviceInfo
+                DeviceInfo deviceInfo = xmlMapper.readValue(xml, DeviceInfo.class);
+                return Flux.just(deviceInfo);
+            } catch (Exception e) {
+                // Handle parsing error
+                return Flux.error(new RuntimeException("Error parsing XML to DeviceInfo: " + e.getMessage(), e));
+            }
+        });
+    }
+}
+-----------------------------------------------------------------------------------
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+
+import java.util.List;
+
+public class DeviceInfo {
+    @JacksonXmlProperty(localName = "prodName")
+    private String prodName;
+
+    @JacksonXmlProperty(localName = "familyName")
+    private String familyName;
+
+    @JacksonXmlProperty(localName = "mfgCode")
+    private String mfgCode;
+
+    @JacksonXmlProperty(localName = "mfgName")
+    private String mfgName;
+
+    @JacksonXmlProperty(localName = "prodType")
+    private String prodType;
+
+    @JacksonXmlElementWrapper(localName = "deviceSkuList")
+    @JacksonXmlProperty(localName = "deviceSkuInfo")
+    private List<DeviceSkuInfo> deviceSkuList;
+
+    // Add other fields similarly...
+
+    // Getters and Setters
+    public String getProdName() {
+        return prodName;
+    }
+
+    public void setProdName(String prodName) {
+        this.prodName = prodName;
+    }
+
+    public String getFamilyName() {
+        return familyName;
+    }
+
+    public void setFamilyName(String familyName) {
+        this.familyName = familyName;
+    }
+
+    // Add other getters and setters...
+}
+
+public class DeviceSkuInfo {
+    @JacksonXmlProperty(localName = "deviceSku")
+    private String deviceSku;
+
+    @JacksonXmlProperty(localName = "skuType")
+    private String skuType;
+
+    // Add other fields...
+
+    // Getters and Setters
+    public String getDeviceSku() {
+        return deviceSku;
+    }
+
+    public void setDeviceSku(String deviceSku) {
+        this.deviceSku = deviceSku;
+    }
+
+    public String getSkuType() {
+        return skuType;
+    }
+
+    public void setSkuType(String skuType) {
+        this.skuType = skuType;
+    }
+}
+-------------------------------------------------------------------------
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
+
+@RestController
+public class DeviceController {
+
+    private final DeviceService deviceService;
+
+    public DeviceController(DeviceService deviceService) {
+        this.deviceService = deviceService;
+    }
+
+    @GetMapping("/devices")
+    public Flux<DeviceInfo> getDevices() {
+        // Simulate an XML Flux source
+        Flux<String> xmlFlux = Flux.just(
+            "<deviceInfo><prodName>LG-VX4400</prodName><familyName>LG-VX4400</familyName>...</deviceInfo>",
+            "<deviceInfo><prodName>LG-VX4600</prodName><familyName>LG-VX4600</familyName>...</deviceInfo>"
+        );
+
+        // Convert and return as Flux<DeviceInfo>
+        return deviceService.parseXmlToDeviceInfo(xmlFlux);
+    }
+}
