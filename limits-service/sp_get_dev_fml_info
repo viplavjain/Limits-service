@@ -1,0 +1,148 @@
+Procedure sp_get_dev_fml_info( p_device_sku_list   In Varchar2
+                            , p_eff_beg_dt         In Date
+                            , p_result_set       Out Sys_RefCursor) As
+
+        l_dev_fam_list   string_array;
+        l_fam_full_list  string_array;
+
+      Begin
+                  DBMS_OUTPUT.PUT_LINE (p_eff_beg_dt || ':p_eff_beg_dt');
+
+        If p_eff_beg_dt Is Not Null Then
+            For rec in (Select distinct acc_sku
+                          From omni_feed_changes
+                         Where last_update_dt >= p_eff_beg_dt
+                           And prod_name       = 'ACC_SKU'
+                           And acc_sku        Is Not Null)
+            Loop
+                sp_comp_sync_by_acc(rec.acc_sku);
+            End Loop;
+        End If;
+
+        For rec in (Select itm_part From item where itm_class1 = 'ACC'
+                    Minus
+                    Select itm_part From item_bkp where itm_class1 = 'ACC')
+        Loop
+            sp_comp_sync_by_acc(rec.itm_part);
+        End Loop;
+
+        If p_device_sku_list Is Not Null Then
+            Select Distinct l.device_family_name
+             Bulk Collect Into l_dev_fam_list
+              From launch_package l, model_product mp
+             Where ',' || trim(p_device_sku_list) || ',' like '%,' || mp.model_id || ',%'
+               And mp.prod_name      = l.prod_name
+               And mp.mfg_code       = l.mfg_code
+               And mp.effective_date = l.effective_date;
+
+             If p_eff_beg_dt Is Null Then
+                l_fam_full_list := l_dev_fam_list;
+                l_dev_fam_list  := Null;
+             End If;
+              sp_get_dev_fml_info_sku( l_fam_full_list , p_result_set);
+        ElsIf p_eff_beg_dt Is Not Null Then
+            Select Distinct l.device_family_name
+              Bulk Collect Into l_dev_fam_list
+              From im_eg_acc_xref_hist x, launch_package l, im_eg_accessory a
+             Where x.equip_id           = l.equip_id
+               And x.create_dt         >= p_eff_beg_dt
+               And x.acc_id             = a.acc_id
+               And Nvl(a.dnh_acc, 'N')  = 'N';
+               sp_get_dev_fml_info_eff(l_dev_fam_list, p_eff_beg_dt, p_result_set);
+        End If;
+      End sp_get_dev_fml_info;
+---------------------------------------------------------------------------------
+Procedure sp_comp_sync_by_acc( p_acc_sku In Varchar2) As
+   Begin
+    -- Add missing pair to the feed
+    Insert Into im_eg_acc_xref_hist(equip_id, acc_id, action, create_dt)
+    Select distinct l.equip_id, a.acc_id, 'I', sysdate
+      From launch_package l, im_eg_acc_xref x, item i, im_eg_accessory a
+     Where a.acc_id    = x.acc_id
+       And l.equip_id  = x.equip_id
+       And i.itm_part  = a.vzw_model
+       And a.vzw_model = p_acc_sku
+       And Not Exists ( Select 1 From mv_atg_acc_comp_check m
+                         Where sor_display_name = device_family_name
+                           And accessory_sor_id = vzw_model);
+    Commit;
+
+    -- Remove incorrect pair to the feed
+    Insert Into im_eg_acc_xref_hist(equip_id, acc_id, action, create_dt)
+    Select distinct l.equip_id, a.acc_id, 'D', sysdate
+      From launch_package l, im_eg_accessory a, mv_atg_acc_comp_check m
+     Where m.accessory_sor_id   = p_acc_sku
+       And a.vzw_model          = m.accessory_sor_id
+       And l.device_family_name = m.sor_display_name
+       And l.equip_id          Is Not Null
+       And Not Exists (Select 1 From im_eg_acc_xref x
+                        Where x.equip_id = l.equip_id
+                          And x.acc_id   = a.acc_id);
+    Commit;
+   End sp_comp_sync_by_acc;
+--------------------------------------------------------------------------------------------
+ Procedure  sp_get_dev_fml_info_sku(l_fam_full_list string_array
+                                         ,p_result_set Out Sys_RefCursor) as
+      Begin
+       Open p_result_set For
+             Select XMLElement("deviceFamilyInfo"
+                                , XMLElement("familyName", family_name)
+                                , XMLElement("imAccessoryList", save_ele)).getClobVal() as deviceFamilyInfo
+                       From ( Select inp.column_value family_name
+                                 , XMLElement("save"
+                                        , ( Select XMLAgg( XMLElement("accSku", vzw_model))
+                                              From ( Select distinct l.device_family_name, a.vzw_model
+                                                       From launch_package l, im_eg_acc_xref x, item i, im_eg_accessory a
+                                                      Where a.acc_id             = x.acc_id
+                                                        And l.equip_id           = x.equip_id
+                                                        And i.itm_part           = a.vzw_model)
+                                             Where device_family_name = inp.column_value)) as save_ele
+                              From Table(Cast(l_fam_full_list as string_array)) inp ) ;
+     End sp_get_dev_fml_info_sku;
+-----------------------------------------------------------------------------------------------
+Procedure  sp_get_dev_fml_info_eff(l_dev_fam_list string_array
+                                         ,p_eff_beg_dt In Date
+                                         ,p_result_set Out Sys_RefCursor) as
+       Begin
+       Open p_result_set For
+         Select XMLElement("deviceFamilyInfo"
+                                , XMLElement("familyName", family_name)
+                                , XMLElement("imAccessoryList", save_ele, remove_ele)).getClobVal() as deviceFamilyInfo
+                       From ( Select inp.column_value family_name
+                                 , XMLElement("save"
+                                        , ( Select XMLAgg( XMLElement("accSku", vzw_model))
+                                              From ( Select distinct l.device_family_name, a.vzw_model
+                                                       From launch_package l, im_eg_acc_xref_hist x, item i, im_eg_accessory a
+                                                      Where a.acc_id             = x.acc_id
+                                                        And a.delete_flag       <> 'Y'
+                                                        And l.equip_id           = x.equip_id
+                                                        And x.action             = 'I'
+                                                        And i.itm_part           = a.vzw_model
+                                                        And x.create_dt         >= p_eff_beg_dt
+                                                        And Nvl(a.dnh_acc, 'N')  = 'N'
+                                                        And Not Exists (Select 1 from mv_atg_acc_comp_check
+                                                                         Where sor_display_name = l.device_family_name
+                                                                           And accessory_sor_id = a.vzw_model)
+                                                        And Exists ( Select 'Yes' From im_eg_acc_xref ox
+                                                                      Where ox.acc_id   = x.acc_id
+                                                                        And ox.equip_id = x.equip_id))
+                                             Where device_family_name = inp.column_value)) as save_ele
+                                 , XMLElement("remove"
+                                        , ( Select XMLAgg( XMLElement("accSku", vzw_model))
+                                              From ( Select distinct l.device_family_name, a.vzw_model
+                                                       From launch_package l, im_eg_acc_xref_hist x, item i, im_eg_accessory a
+                                                      Where a.acc_id             = x.acc_id
+                                                        And l.equip_id           = x.equip_id
+                                                        And x.action             = 'D'
+                                                        And i.itm_part           = a.vzw_model
+                                                        And x.create_dt         >= p_eff_beg_dt
+                                                        And Nvl(a.dnh_acc, 'N')  = 'N'
+                                                        And Not Exists ( Select 'No' From im_eg_acc_xref ox, launch_package li, im_eg_accessory ai
+                                                                          Where ai.vzw_model          = a.vzw_model
+                                                                            And ai.delete_flag       <> 'Y'
+                                                                            And li.device_family_name = l.device_family_name
+                                                                            And ox.acc_id             = ai.acc_id
+                                                                            And ox.equip_id           = li.equip_id))
+                                             Where device_family_name = inp.column_value)) as remove_ele
+                              From Table(Cast(l_dev_fam_list as string_array)) inp );
+       End  sp_get_dev_fml_info_eff;
