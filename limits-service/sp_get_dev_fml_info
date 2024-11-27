@@ -146,3 +146,23 @@ Procedure  sp_get_dev_fml_info_eff(l_dev_fam_list string_array
                                              Where device_family_name = inp.column_value)) as remove_ele
                               From Table(Cast(l_dev_fam_list as string_array)) inp );
        End  sp_get_dev_fml_info_eff;
+-------------------------------------------------------------------------------
+Outer Query:
+Iterates over each device family name from the l_fam_full_list array.
+Constructs an XML element deviceFamilyInfo for each family.
+Includes two child elements:
+familyName: The name of the device family.
+imAccessoryList: A list of accessory SKUs associated with the family.
+Inner Query:
+For each family name, retrieves accessory information from the launch_package, im_eg_acc_xref, item, and im_eg_accessory tables.
+Aggregates the accessory SKUs using XMLAgg and constructs an XML element save_ele.
+Closing the Cursor:
+
+SQL
+End sp_get_dev_fml_info_sku;
+Use code with caution.
+
+Closes the cursor.
+Overall Purpose:
+
+This procedure efficiently retrieves accessory information for a given list of device families. It constructs an XML result set that is easy to parse and consume by client applications. The XML structure provides a clear representation of the device family and its associated accessories.
