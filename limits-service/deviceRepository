@@ -120,4 +120,11 @@ public class DeviceInfoService {
         return repository.getDeviceInfo(skuCode);
     }
 }
+------------------------------------------------------------------------
+@Repository
+public interface DMDRepository extends ReactiveCrudRepository<EPCDeviceModel, String> {
+    @Query(CommonConstants.DMD_DEVICE_QUERY)
+    Flux<String> findByIdDevice(@Param("sorid") String sorid);
+
+}
 
