@@ -1,0 +1,52 @@
+@Configuration
+@EnableR2dbcRepositories(
+    basePackages = "com.example.repository",
+    includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = Repository1.class),
+    connectionFactoryRef = "connectionFactory1"
+)
+public class Repository1Config {
+}
+
+@Configuration
+@EnableR2dbcRepositories(
+    basePackages = "com.example.repository",
+    includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = Repository2.class),
+    connectionFactoryRef = "connectionFactory2"
+)
+public class Repository2Config {
+}
+-----------------------------------------------------------------------------------------------------------------------
+import io.r2dbc.spi.ConnectionFactory;
+import io.r2dbc.spi.ConnectionFactoryOptions;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import static io.r2dbc.spi.ConnectionFactoryOptions.*;
+
+@Configuration
+public class R2dbcConfig {
+
+    @Bean(name = "connectionFactory1")
+    public ConnectionFactory connectionFactory1() {
+        return ConnectionFactories.get(ConnectionFactoryOptions.builder()
+            .option(DRIVER, "oracle")
+            .option(HOST, "host1")
+            .option(PORT, 1521) // Default Oracle port
+            .option(DATABASE, "database1")
+            .option(USER, "user1")
+            .option(PASSWORD, "password1")
+            .build());
+    }
+
+    @Bean(name = "connectionFactory2")
+    public ConnectionFactory connectionFactory2() {
+        return ConnectionFactories.get(ConnectionFactoryOptions.builder()
+            .option(DRIVER, "oracle")
+            .option(HOST, "host2")
+            .option(PORT, 1521) // Default Oracle port
+            .option(DATABASE, "database2")
+            .option(USER, "user2")
+            .option(PASSWORD, "password2")
+            .build());
+    }
+}
