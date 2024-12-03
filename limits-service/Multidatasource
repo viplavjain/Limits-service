@@ -110,5 +110,8 @@ public class RepositoryConfig1 {
 public class RepositoryConfig2 {
 }
 
+----------------------------------------------------------------------------------------------------------------
+The bean 'DPIRepository', defined in com.vzw.federated_catalog_tools_ms.repository.DPIRepository defined in @EnableR2dbcRepositories declared on Repository2Config, could not be registered. A bean with that name has already been defined in com.vzw.federated_catalog_tools_ms.repository.DPIRepository defined in @EnableR2dbcRepositories declared on Repository1Config and overriding is disabled.
+
 
 
