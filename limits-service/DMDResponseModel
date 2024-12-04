@@ -315,3 +315,69 @@
     }
   ]
 }
+
+------------------------------------------------------------------------------------------------
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+
+import java.util.List;
+
+public class XmlStringToJavaMapper {
+
+    public static void main(String[] args) throws Exception {
+        // Your XML string
+        String xmlContent = "<root>" + 
+                "     <deviceInfo>" +
+                "         <prodName>LG-VX4400</prodName>" +
+                "         <familyName>LG-VX4400</familyName>" +
+                "         <mfgCode>LGI</mfgCode>" +
+                "         <mfgName>" +
+                "             <__cdata>LG</__cdata>" +
+                "         </mfgName>" +
+                "         <prodType>Phone</prodType>" +
+                "         <imProdName>VX4400</imProdName>" +
+                "         <deviceSkuList>" +
+                "             <deviceSkuInfo>" +
+                "                 <deviceSku>LG-VX4400BM</deviceSku>" +
+                "                 <skuType>CLNR</skuType>" +
+                "             </deviceSkuInfo>" +
+                "         </deviceSkuList>" +
+                "     </deviceInfo>" +
+                "     <deviceInfo>" +
+                "         <prodName>LG-VX4600</prodName>" +
+                "         <familyName>LG-VX4600</familyName>" +
+                "         <mfgCode>LGI</mfgCode>" +
+                "         <mfgName>" +
+                "             <__cdata>LG</__cdata>" +
+                "         </mfgName>" +
+                "         <prodType>Phone</prodType>" +
+                "         <imProdName>VX4600</imProdName>" +
+                "         <deviceSkuList>" +
+                "             <deviceSkuInfo>" +
+                "                 <deviceSku>FRULGVX4600</deviceSku>" +
+                "                 <skuType>CLNR</skuType>" +
+                "             </deviceSkuInfo>" +
+                "         </deviceSkuList>" +
+                "     </deviceInfo>" +
+                "</root>";
+
+        // Instantiate the XmlMapper
+        XmlMapper xmlMapper = new XmlMapper();
+
+        // Deserialize the XML string into a List of DeviceInfo
+        List<DeviceInfo> deviceInfos = xmlMapper.readValue(xmlContent,
+                xmlMapper.getTypeFactory().constructCollectionType(List.class, DeviceInfo.class));
+
+        // Print the deserialized data
+        deviceInfos.forEach(deviceInfo -> {
+            System.out.println("Prod Name: " + deviceInfo.getProdName());
+            System.out.println("Family Name: " + deviceInfo.getFamilyName());
+            System.out.println("Mfg Code: " + deviceInfo.getMfgCode());
+            System.out.println("Mfg Name: " + deviceInfo.getMfgName().getValue());
+            System.out.println("Device SKU List: " + deviceInfo.getDeviceSkuList().getDeviceSkuInfo());
+        });
+    }
+}
+---------------------------------------------------------------------
+@JacksonXmlElementWrapper(localName = "universalPropCdList", useWrapping = true)
+    private List<String> universalPropCdList;
+
