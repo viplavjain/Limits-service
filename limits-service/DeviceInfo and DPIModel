@@ -1,0 +1,178 @@
+@Getter
+@Setter
+public class DeviceInfo {
+
+    private String prodName;
+
+    private String familyName;
+
+    private String mfgCode;
+
+    private String mfgName;
+
+    private String prodType;
+
+    private String dacc;
+
+    private String imProdName;
+
+    private String imImageUrl;
+
+    private String imDeviceCategory;
+
+    private String deviceType;
+
+    private String globalPhone;
+
+    private String deviceCategory;
+
+    private String deviceCapabilityInd;
+
+    private String backupAssistCapable;
+
+    private String preferredSim;
+
+    private String preferredSoftSim;
+
+    private String alternateSim;
+
+    private String simClass4G;
+
+    private String nfcCapable;
+
+    private String nfcCompatible;
+
+    private String smsCapable;
+
+    private String deviceFamilyType;
+
+    private String buddyUpgrdEligInd;
+
+    private String restrictToFamilyInd;
+
+    private String hdVoice;
+
+    private String coverageCheck4G;
+
+    private String v4b;
+
+    private String numberShareCapable;
+
+    private String euiccCapable;
+
+    private String esimOnlyInd;
+
+    private String vendorKey;
+
+    private String dsds;
+
+    private String operatingSystem;
+
+    private String eligibleNumShareOS;
+
+    private String universalDevice;
+
+    private String wifiCalling;
+
+    private String e911AddrInd;
+
+    private String cdmaCapableInd;
+
+    private String gsmCapableInd;
+
+    private String deviceCarrier;
+
+    private String postpaidRestrictStartDate;
+
+    private String prepayRestrictStartDate;
+
+    @JsonProperty("universalPropCdList")
+    private UniversalPropCdList universalPropCdList;
+
+    private String universalPropCd;
+
+    private String deviceSkuList;
+
+    private String deviceSkuInfo;
+
+    private String deviceSku;
+
+    private String virtualSimSku;
+
+    private String skuType;
+
+    private String prodCode1;
+
+    private String prodCode2;
+
+    private String prodCode3;
+
+    private String prodCode4;
+
+    private String prodCode5;
+
+    private String btaEligiblity;
+
+    private String upcCode;
+
+    private String prepaySkuInd;
+
+    private String edgeEligibleInd;
+
+    private String edgeDpcGroup;
+
+    private String edgeDpcItem;
+
+    private String imEquipID;
+
+    private String upcCodeFull;
+
+    private String edgeDeviceCap;
+
+    private String instantCredit;
+
+    private String ispuEligible;
+
+    private String prop65;
+
+    private String pairedSkuInfo;
+
+    private String imFeatureNameList;
+
+    private String marketingCompatibleSimSkuList;
+
+    @Getter
+    @Setter
+    static class UniversalPropCdList {
+
+        @JacksonXmlElementWrapper(useWrapping = false)
+        @JacksonXmlProperty(localName="universalPropCd")
+        private List<String> universalPropCd = new ArrayList<>();
+
+    }
+
+}
+---------------------------------------------------------------------------
+@Table
+@Getter
+@Setter
+public class DPIModel {
+    @Column("SKU")
+    public String sku; //sorID or itm_part
+    @Column("SKU_TYPE")
+    public String skuType; //itm_class1
+    @Column("ONE_YEAR_PRICE")
+    public String oneYearPrice; //price_1
+    @Column("TWO_YEAR_PRICE")
+    public String twoYearPrice; //price_2
+    @Column("PREPAY_PRICE")
+    public String prepayPrice; //price_3
+    @Column("FULL_RETAIL_PRICE")
+    public String fullRetailPrice; //price_4
+    @Column("LOCATION_CODE")
+    public String locationCode; //area_loc
+    @Column("EDGE_SKU")
+    public String edgeSku; //itm_wave_eligible
+    @Column("EDGE_FULL_RETAIL_PRICE")
+    public String edgeFullRetailPrice; //(itm_wave_eligible+price_4+price_5)
+}
