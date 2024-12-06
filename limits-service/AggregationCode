@@ -1,0 +1,10 @@
+public Flux<HashMap<String, Object>> fetchAllData(String sorid){
+      return Flux.zip(dmdGetDataService.getDMDDeviceDetails("dmd","LG-VX4400BM","device"),
+             dpiGetDataService.getDPIDeviceDetails("dpi","ADR6400LVW","device") )
+              .map(results -> {
+             HashMap<String,Object> resultMap = new HashMap<>();
+             resultMap.put("dmdAPI", results.getT1());
+          resultMap.put( "dpiAPI", results.getT2());
+          return resultMap;
+      });
+    }
