@@ -8,3 +8,54 @@ public Flux<HashMap<String, Object>> fetchAllData(String sorid){
           return resultMap;
       });
     }
+-------------------------------------------------------------------------------------------
+@RestController
+@RequestMapping("/devices")
+public class DeviceController {
+
+    @Autowired
+    private DeviceService deviceService;
+
+    @GetMapping("/fetch")
+    public Mono<Map<String, Object>> fetchAllDevices(@RequestParam String sorId) {
+        return deviceService.fetchAllData(sorId)
+                .map(resultMap -> {
+                    Map<String, Object> response = new HashMap<>();
+
+                    // Extract and cast the results
+                    List<DeviceInfo> dmdDevices = (List<DeviceInfo>) resultMap.get("dmdAPI");
+                    List<DPIModel> dpiDevices = (List<DPIModel>) resultMap.get("dpiAPI");
+
+                    // Add results to the response
+                    response.put("dmdDevices", dmdDevices);
+                    response.put("dpiDevices", dpiDevices);
+
+                    return response;
+                });
+    }
+}
+------------------------------------------------------
+@Service
+public class DeviceService {
+
+    @Autowired
+    private DMDGetDataService dmdGetDataService;
+
+    @Autowired
+    private DPIGetDataService dpiGetDataService;
+
+    public Mono<Map<String, Object>> fetchAllData(String sorId) {
+        // Use collectList() to gather Flux results into lists
+        return Mono.zip(
+                dmdGetDataService.getDMDDeviceDetails("dmd", "LG-VX4400BM", "device").collectList(),
+                dpiGetDataService.getDPIDeviceDetails("dpi", "ADR6400LVW", "device").collectList()
+        ).map(results -> {
+            Map<String, Object> resultMap = new HashMap<>();
+            resultMap.put("dmdAPI", results.getT1()); // List<DeviceInfo>
+            resultMap.put("dpiAPI", results.getT2()); // List<DPIModel>
+            return resultMap;
+        });
+    }
+}
+
+
