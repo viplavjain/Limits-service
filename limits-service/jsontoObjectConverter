@@ -1,0 +1,16 @@
+public static TokenModel jsonToObject(String filePath)  {
+       ObjectMapper objectMapper = new ObjectMapper();
+        TokenModel tokenModel = new TokenModel();
+       try(InputStream inputStream = JsonToObjectConverter.class.getClassLoader()
+               .getResourceAsStream(filePath)){
+         if(inputStream== null) {
+             throw new IllegalArgumentException("File not found in resources");
+         }
+           tokenModel = objectMapper.readValue(inputStream,TokenModel.class);
+         return tokenModel;
+       }
+       catch(IOException e){
+           e.printStackTrace();
+       }
+        return tokenModel;
+    }
