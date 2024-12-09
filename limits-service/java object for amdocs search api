@@ -60,3 +60,40 @@ public class SearchRequest {
     public List<String> includeFields;
   }
 }
+----------------------------------------------------------------------------------
+Response Body
+{
+    "type": "CombinedDocumentsSearchResponse",
+    "documents": [
+        {
+            "entityType": "productoffering",
+            "documentMetaData": {
+                "lastModifiedDateTime": null,
+                "lastModifiedUser": null,
+                "documentID": "791ae975-4531-47cd-b65f-ed3f91c92a85",
+                "documentLevel": null,
+                "documentName": [],
+                "sharedStatus": null,
+                "publishedStatus": null,
+                "productionStatus": null,
+                "coreStatus": null,
+                "businessEntityType": null,
+                "originalEntityType": null,
+                "customEntityType": null,
+                "baseBusinessRequestID": null,
+                "mergeBusinessRequestID": null,
+                "rootID": null,
+                "rootEntityType": null,
+                "rootIndexType": null,
+                "baseStatus": null,
+                "code": null
+            },
+            "deleted": false
+        }
+    ],
+    "count": {
+        "total": 1,
+        "productoffering": 1
+    },
+    "paths": null
+}
