@@ -1,0 +1,89 @@
+Search api request
+{
+	"context" : {
+		"level" : "PUBLISHED",
+		"workstreamName" : "production",
+		"user" : "epc_user"
+	},
+	"item" : {
+		"type" : "CombinedSearchItem",
+		"and" : [],
+		"not" : [],
+		"or" : [{
+				"type" : "IdentifierSearchItem",
+				"text" : "\"MU6F3LL/A\"",
+				"locale" : "en-US",
+				"types" : ["productoffering"]
+			}, {
+				"types" : ["productoffering"],
+				"type" : "CriteriaSearchItem",
+				"criteria" : {
+					"filterCondition" : {
+						"type" : "NestedCondition",
+						"path" : "document.externalId",
+						"condition" : {
+							"type" : "InCondition",
+							"field" : "document.externalId.id",
+							"values" : ["MU6F3LL/A"]
+						}
+					}
+				}
+			}
+		],
+		"filter" : {
+			"type" : "BooleanCondition",
+			"or" : [],
+			"and" : [{
+					"type" : "BooleanCondition",
+					"and" : [{
+							"type" : "InCondition",
+							"field" : "documentMetaData.businessEntityType",
+							"values" : ["productOffering"]
+						}
+					]
+				}
+			],
+			"not" : []
+		}
+	},
+	"responseFilter" : {
+		"includeFields" : ["documentMetaData.documentID"]
+	},
+	"cacheResultID" : null
+}
+*******************Response*****************************
+{
+    "type": "CombinedDocumentsSearchResponse",
+    "documents": [
+        {
+            "entityType": "productoffering",
+            "documentMetaData": {
+                "lastModifiedDateTime": null,
+                "lastModifiedUser": null,
+                "documentID": "791ae975-4531-47cd-b65f-ed3f91c92a85",
+                "documentLevel": null,
+                "documentName": [],
+                "sharedStatus": null,
+                "publishedStatus": null,
+                "productionStatus": null,
+                "coreStatus": null,
+                "businessEntityType": null,
+                "originalEntityType": null,
+                "customEntityType": null,
+                "baseBusinessRequestID": null,
+                "mergeBusinessRequestID": null,
+                "rootID": null,
+                "rootEntityType": null,
+                "rootIndexType": null,
+                "baseStatus": null,
+                "code": null
+            },
+            "deleted": false
+        }
+    ],
+    "count": {
+        "total": 1,
+        "productoffering": 1
+    },
+    "paths": null
+}
