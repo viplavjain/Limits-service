@@ -62,38 +62,42 @@ public class SearchRequest {
 }
 ----------------------------------------------------------------------------------
 Response Body
-{
-    "type": "CombinedDocumentsSearchResponse",
-    "documents": [
-        {
-            "entityType": "productoffering",
-            "documentMetaData": {
-                "lastModifiedDateTime": null,
-                "lastModifiedUser": null,
-                "documentID": "791ae975-4531-47cd-b65f-ed3f91c92a85",
-                "documentLevel": null,
-                "documentName": [],
-                "sharedStatus": null,
-                "publishedStatus": null,
-                "productionStatus": null,
-                "coreStatus": null,
-                "businessEntityType": null,
-                "originalEntityType": null,
-                "customEntityType": null,
-                "baseBusinessRequestID": null,
-                "mergeBusinessRequestID": null,
-                "rootID": null,
-                "rootEntityType": null,
-                "rootIndexType": null,
-                "baseStatus": null,
-                "code": null
-            },
-            "deleted": false
+public class CombinedDocumentsSearchResponse {
+    private String type;
+    private List<Document> documents;
+    private Count count;
+    private Object paths; // Can be null or a specific type based on actual data
+
+    public static class Document {
+        private String entityType;
+        private DocumentMetaData documentMetaData;
+        private boolean deleted;
+
+        public static class DocumentMetaData {
+            private LocalDateTime lastModifiedDateTime;
+            private String lastModifiedUser;
+            private UUID documentID;
+            private Integer documentLevel;
+            private List<String> documentName;
+            private String sharedStatus;
+            private String publishedStatus;
+            private String productionStatus;
+            private String coreStatus;
+            private String businessEntityType;
+            private String originalEntityType;
+            private String customEntityType;
+            private String baseBusinessRequestID;
+            private String mergeBusinessRequestID;
+            private String rootID;
+            private String rootEntityType;
+            private String rootIndexType;
+            private String baseStatus;
+            private String code;
         }
-    ],
-    "count": {
-        "total": 1,
-        "productoffering": 1
-    },
-    "paths": null
+    }
+
+    public static class Count {
+        private int total;
+        private int productoffering;
+    }
 }
