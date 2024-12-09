@@ -1,0 +1,62 @@
+public class SearchRequest {
+
+  public Context context;
+  public Item item;
+  public ResponseFilter responseFilter;
+  public String cacheResultID;
+
+  public static class Context {
+    public String level;
+    public String workstreamName;
+    public String user;
+  }
+
+  public static class Item {
+    public String type;
+    public List<CombinedSearchItem> and;
+    public List<CombinedSearchItem> not;
+    public List<CombinedSearchItem> or;
+    public Filter filter;
+  }
+
+  public static class CombinedSearchItem {
+    public String type;
+    public String text;
+    public String locale;
+    public List<String> types;
+
+    // OR another option for CombinedSearchItem (if text is not used)
+    public Criteria criteria;
+  }
+
+  public static class Criteria {
+    public NestedCondition filterCondition;
+  }
+
+  public static class NestedCondition {
+    public String path;
+    public InCondition condition;
+  }
+
+  public static class InCondition {
+    public String field;
+    public List<String> values;
+  }
+
+  public static class Filter {
+    public String type;
+    public List<BooleanCondition> or;
+    public List<BooleanCondition> and;
+    public List<BooleanCondition> not;
+  }
+
+  public static class BooleanCondition {
+    public List<BooleanCondition> and;
+    public List<InCondition> in; // Assuming "in" is used instead of a generic list for clarity
+    public List<BooleanCondition> not;
+  }
+
+  public static class ResponseFilter {
+    public List<String> includeFields;
+  }
+}
