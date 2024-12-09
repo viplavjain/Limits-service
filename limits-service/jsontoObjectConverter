@@ -29,3 +29,20 @@ public static <T> T jsonToObject(String filePath, Class<T> clazz) {
         throw new RuntimeException("Error parsing JSON file", e);
     }
 }
+
+@GetMapping("/getEPCDeviceDetails/{type}/{sys}")
+    public Mono<Token> getEPCDeviceDetails(@PathVariable String type, @PathVariable String sys, @RequestParam(value = "sorid", required = true) String sorid) {
+        log.info("getDMDDeviceDetails API called");
+        Mono<Token> tokenMono = tokenService.getToken();
+        AmdocsSearchRequest amdocsSearchRequest = JsonToObjectConverter.jsonToObject("token.json",AmdocsSearchRequest.class);
+        tokenMono.flatMap(token ->  {
+            String bearerToken = "Bearer" + token.getToken();
+            return webClient.post()
+                    .uri("https://catalogone-apigw-qa1b-at-npge.ebiz.verizon.com/entitySearchServices/v1/search/combined")
+                    .bodyValue(amdocsSearchRequest)
+                    .header("Authorization",bearerToken)
+
+                    .retrieve()
+                    .bodyToMono(Token.class);
+        });
+    }
