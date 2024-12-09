@@ -14,3 +14,18 @@ public static TokenModel jsonToObject(String filePath)  {
        }
         return tokenModel;
     }
+--------------------------------------------------------
+public static <T> T jsonToObject(String filePath, Class<T> clazz) {
+    ObjectMapper objectMapper = new ObjectMapper();
+    try (InputStream inputStream = JsonToObjectConverter.class.getClassLoader()
+            .getResourceAsStream(filePath)) {
+        if (inputStream == null) {
+            throw new IllegalArgumentException("File not found in resources");
+        }
+        return objectMapper.readValue(inputStream, clazz);
+    } catch (IOException e) {
+        e.printStackTrace();
+        // Consider throwing a more specific exception or handling the error differently
+        throw new RuntimeException("Error parsing JSON file", e);
+    }
+}
