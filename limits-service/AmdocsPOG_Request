@@ -1,0 +1,22 @@
+{
+	"context" : {
+		"level" : "PUBLISHED",
+		"workstreamName" : "production",
+		"user" : "epc_user"
+	},
+	"ids" : [{
+			"id" : "81750fe9-4fd9-4a39-9a54-420c0dab3fb8",
+			"type" : "productOfferingGroup"
+		}
+	],
+	"traversalPath" : [{
+			"types" : ["policy"],
+			"direction" : "down",
+			"depth" : 1
+		}, {
+			"types" : ["metadata"],
+			"direction" : "up",
+			"depth" : 1
+		}
+	]
+}
