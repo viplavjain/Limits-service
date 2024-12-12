@@ -150,6 +150,7 @@ Response
                         "freeTextDefault": []
                     },
                     
+                    
                     {
                         "allowProductOfferingOverride": false,
                         "configurable": false,
@@ -184,7 +185,24 @@ Response
                                     }
                                 ]
                             },
-                            
+                            {
+                                "default": false,
+                                "expiredForSales": false,
+                                "localizedValue": [
+                                    {
+                                        "locale": "en-US",
+                                        "value": "30 | 100 | 03 Jan 2021 05:00 AM UTC | 31 Dec 9999 05:00 AM UTC"
+                                    }
+                                ],
+                                "value": "1992ea5f-7756-40a7-b381-a29235e387ef",
+                                "sourceElementRef": [
+                                    {
+                                        "id": "1992ea5f-7756-40a7-b381-a29235e387ef",
+                                        "type": "genericElementEntry",
+                                        "jsonPath": "id"
+                                    }
+                                ]
+                            },
                             {
                                 "default": false,
                                 "expiredForSales": false,
@@ -206,7 +224,7 @@ Response
                         ],
                         "freeTextDefault": []
                     },
-                    
+                 
                     {
                         "allowProductOfferingOverride": false,
                         "configurable": false,
@@ -214,13 +232,13 @@ Response
                         "localizedName": [
                             {
                                 "locale": "en-US",
-                                "value": "Creation Date"
+                                "value": "Great Plains Price (Indirects)"
                             }
                         ],
                         "maxCardinality": 1,
                         "minCardinality": 0,
-                        "name": "creationDate",
-                        "valueType": "Date",
+                        "name": "greatPlainsPrice",
+                        "valueType": "Float",
                         "variantGroupCharacteristic": false,
                         "productOfferingCharacteristicValue": [
                             {
@@ -229,16 +247,15 @@ Response
                                 "localizedValue": [
                                     {
                                         "locale": "en-US",
-                                        "value": "20 July 2024"
+                                        "value": "1510"
                                     }
                                 ],
-                                "value": "2024-07-20T05:11:55Z",
+                                "value": "1510",
                                 "sourceElementRef": []
                             }
                         ],
                         "freeTextDefault": []
                     },
-                    
                     {
                         "allowProductOfferingOverride": false,
                         "configurable": false,
@@ -270,37 +287,7 @@ Response
                         ],
                         "freeTextDefault": []
                     },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Coming Soon"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "comingSoonFlag",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "value": "False",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
+                    
                     {
                         "allowProductOfferingOverride": false,
                         "configurable": false,
@@ -354,15 +341,15 @@ Response
                 "prodSpecCharValueUse": [],
                 "characteristics": [
                     {
-                        "name": "activeFlag",
+                        "name": "showcaseFlag",
                         "localizedName": [
                             {
                                 "locale": "en-US",
-                                "value": "Active Flag"
+                                "value": "Showcase Flag"
                             }
                         ],
-                        "flatLocale_localizedName_en_US": "Active Flag",
-                        "distinct_en_US": "Active Flag||activeFlag||Boolean",
+                        "flatLocale_localizedName_en_US": "Showcase Flag",
+                        "distinct_en_US": "Showcase Flag||showcaseFlag||Boolean",
                         "type": "Boolean",
                         "values": [
                             {
@@ -381,130 +368,6 @@ Response
                         ]
                     },
                     
-                    {
-                        "name": "supportOnlyFlag",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Support Only Flag"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "Support Only Flag",
-                        "distinct_en_US": "Support Only Flag||supportOnlyFlag||Boolean",
-                        "type": "Boolean",
-                        "values": [
-                            {
-                                "valueBoolean": false,
-                                "value": "False",
-                                "flatLocale_localizedValue_en_US": "No",
-                                "distinct_en_US": "No||False",
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "default": false
-                            }
-                        ]
-                    },
-                    {
-                        "name": "displayInSiteSearch",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Display In site search"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "Display In site search",
-                        "distinct_en_US": "Display In site search||displayInSiteSearch||Boolean",
-                        "type": "Boolean",
-                        "values": [
-                            {
-                                "valueBoolean": true,
-                                "value": "True",
-                                "flatLocale_localizedValue_en_US": "Yes",
-                                "distinct_en_US": "Yes||True",
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "Yes"
-                                    }
-                                ],
-                                "default": false
-                            }
-                        ]
-                    },
-                    
-                    {
-                        "name": "doNotDisplayIfOutOfStock",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Do Not Display If Out Of stock"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "Do Not Display If Out Of stock",
-                        "distinct_en_US": "Do Not Display If Out Of stock||doNotDisplayIfOutOfStock||Boolean",
-                        "type": "Boolean",
-                        "values": [
-                            {
-                                "valueBoolean": false,
-                                "value": "False",
-                                "flatLocale_localizedValue_en_US": "No",
-                                "distinct_en_US": "No||False",
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "default": false
-                            }
-                        ]
-                    },
-                   
-                    {
-                        "name": "deviceCondition",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Device Condition"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "Device Condition",
-                        "distinct_en_US": "Device Condition||deviceCondition||String",
-                        "type": "String",
-                        "values": []
-                    },
-                    
-                    {
-                        "name": "skipECPDDiscount",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Skip ECPD Discount"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "Skip ECPD Discount",
-                        "distinct_en_US": "Skip ECPD Discount||skipECPDDiscount||Boolean",
-                        "type": "Boolean",
-                        "values": [
-                            {
-                                "valueBoolean": false,
-                                "value": "False",
-                                "flatLocale_localizedValue_en_US": "No",
-                                "distinct_en_US": "No||False",
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "default": false
-                            }
-                        ]
-                    },
                     
                     {
                         "name": "devicePaymentConfigSetup",
@@ -530,7 +393,18 @@ Response
                                 ],
                                 "default": false
                             },
-                            
+                            {
+                                "value": "1992ea5f-7756-40a7-b381-a29235e387ef",
+                                "flatLocale_localizedValue_en_US": "30 | 100 | 03 Jan 2021 05:00 AM UTC | 31 Dec 9999 05:00 AM UTC",
+                                "distinct_en_US": "30 | 100 | 03 Jan 2021 05:00 AM UTC | 31 Dec 9999 05:00 AM UTC||1992ea5f-7756-40a7-b381-a29235e387ef",
+                                "localizedValue": [
+                                    {
+                                        "locale": "en-US",
+                                        "value": "30 | 100 | 03 Jan 2021 05:00 AM UTC | 31 Dec 9999 05:00 AM UTC"
+                                    }
+                                ],
+                                "default": false
+                            },
                             {
                                 "value": "e873e64c-c2fc-4e16-8ec7-4ba526ded927",
                                 "flatLocale_localizedValue_en_US": "36 | 100 | 28 Jan 2022 05:00 AM UTC | 31 Dec 9999 05:00 AM UTC",
@@ -545,33 +419,7 @@ Response
                             }
                         ]
                     },
-                    {
-                        "name": "preferredTerm",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Device Payment Preferred term"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "Device Payment Preferred term",
-                        "distinct_en_US": "Device Payment Preferred term||preferredTerm||Integer",
-                        "type": "Integer",
-                        "values": [
-                            {
-                                "valueInteger": 36,
-                                "value": "36",
-                                "flatLocale_localizedValue_en_US": "36",
-                                "distinct_en_US": "36||36",
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "36"
-                                    }
-                                ],
-                                "default": false
-                            }
-                        ]
-                    },
+                    
                     {
                         "name": "itemSaleflag",
                         "localizedName": [
@@ -666,19 +514,7 @@ Response
                         "type": "Date",
                         "values": []
                     },
-                    {
-                        "name": "preConfigurCartEndDate",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "PreConfigure Cart End Date"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "PreConfigure Cart End Date",
-                        "distinct_en_US": "PreConfigure Cart End Date||preConfigurCartEndDate||Date",
-                        "type": "Date",
-                        "values": []
-                    },
+                   
                     {
                         "name": "greatPlainsPrice",
                         "localizedName": [
