@@ -149,290 +149,7 @@ Response
                         ],
                         "freeTextDefault": []
                     },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Showcase Flag"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "showcaseFlag",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "Yes"
-                                    }
-                                ],
-                                "value": "True",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Support Only Flag"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "supportOnlyFlag",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "value": "False",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Display In site search"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "displayInSiteSearch",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "Yes"
-                                    }
-                                ],
-                                "value": "True",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "My Business Unique"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "MyBusinessUnique",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "value": "False",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Do Not Display If Out Of stock"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "doNotDisplayIfOutOfStock",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "value": "False",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Display Name B2B"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "b2bDisplayName",
-                        "valueType": "String",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Device Condition"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "deviceCondition",
-                        "valueType": "String",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Manual Discount Allowed"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "manualDiscountAllowed",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "Yes"
-                                    }
-                                ],
-                                "value": "True",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Skip ECPD Discount"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "skipECPDDiscount",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "value": "False",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Default Display flag"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "defaultDisplayFlag",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "value": "False",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
+                    
                     {
                         "allowProductOfferingOverride": false,
                         "configurable": false,
@@ -467,24 +184,7 @@ Response
                                     }
                                 ]
                             },
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "30 | 100 | 03 Jan 2021 05:00 AM UTC | 31 Dec 9999 05:00 AM UTC"
-                                    }
-                                ],
-                                "value": "1992ea5f-7756-40a7-b381-a29235e387ef",
-                                "sourceElementRef": [
-                                    {
-                                        "id": "1992ea5f-7756-40a7-b381-a29235e387ef",
-                                        "type": "genericElementEntry",
-                                        "jsonPath": "id"
-                                    }
-                                ]
-                            },
+                            
                             {
                                 "default": false,
                                 "expiredForSales": false,
@@ -506,68 +206,7 @@ Response
                         ],
                         "freeTextDefault": []
                     },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Device Payment Preferred term"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "preferredTerm",
-                        "valueType": "Integer",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "36"
-                                    }
-                                ],
-                                "value": "36",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Item Sale"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "itemSaleflag",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "Yes"
-                                    }
-                                ],
-                                "value": "True",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
+                    
                     {
                         "allowProductOfferingOverride": false,
                         "configurable": false,
@@ -599,104 +238,7 @@ Response
                         ],
                         "freeTextDefault": []
                     },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Enable Preconfigure Cart"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "enablePreConfigureCart",
-                        "valueType": "Boolean",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "value": "False",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "PreConfigure Cart Start Date"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "preConfigurCartStartDate",
-                        "valueType": "Date",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "PreConfigure Cart End Date"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "preConfigurCartEndDate",
-                        "valueType": "Date",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [],
-                        "freeTextDefault": []
-                    },
-                    {
-                        "allowProductOfferingOverride": false,
-                        "configurable": false,
-                        "expiredForSales": false,
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Great Plains Price (Indirects)"
-                            }
-                        ],
-                        "maxCardinality": 1,
-                        "minCardinality": 0,
-                        "name": "greatPlainsPrice",
-                        "valueType": "Float",
-                        "variantGroupCharacteristic": false,
-                        "productOfferingCharacteristicValue": [
-                            {
-                                "default": false,
-                                "expiredForSales": false,
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "1510"
-                                    }
-                                ],
-                                "value": "1510",
-                                "sourceElementRef": []
-                            }
-                        ],
-                        "freeTextDefault": []
-                    },
+                    
                     {
                         "allowProductOfferingOverride": false,
                         "configurable": false,
@@ -838,33 +380,7 @@ Response
                             }
                         ]
                     },
-                    {
-                        "name": "showcaseFlag",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Showcase Flag"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "Showcase Flag",
-                        "distinct_en_US": "Showcase Flag||showcaseFlag||Boolean",
-                        "type": "Boolean",
-                        "values": [
-                            {
-                                "valueBoolean": true,
-                                "value": "True",
-                                "flatLocale_localizedValue_en_US": "Yes",
-                                "distinct_en_US": "Yes||True",
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "Yes"
-                                    }
-                                ],
-                                "default": false
-                            }
-                        ]
-                    },
+                    
                     {
                         "name": "supportOnlyFlag",
                         "localizedName": [
@@ -919,33 +435,7 @@ Response
                             }
                         ]
                     },
-                    {
-                        "name": "MyBusinessUnique",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "My Business Unique"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "My Business Unique",
-                        "distinct_en_US": "My Business Unique||MyBusinessUnique||Boolean",
-                        "type": "Boolean",
-                        "values": [
-                            {
-                                "valueBoolean": false,
-                                "value": "False",
-                                "flatLocale_localizedValue_en_US": "No",
-                                "distinct_en_US": "No||False",
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "default": false
-                            }
-                        ]
-                    },
+                    
                     {
                         "name": "doNotDisplayIfOutOfStock",
                         "localizedName": [
@@ -973,19 +463,7 @@ Response
                             }
                         ]
                     },
-                    {
-                        "name": "b2bDisplayName",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Display Name B2B"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "Display Name B2B",
-                        "distinct_en_US": "Display Name B2B||b2bDisplayName||String",
-                        "type": "String",
-                        "values": []
-                    },
+                   
                     {
                         "name": "deviceCondition",
                         "localizedName": [
@@ -999,33 +477,7 @@ Response
                         "type": "String",
                         "values": []
                     },
-                    {
-                        "name": "manualDiscountAllowed",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Manual Discount Allowed"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "Manual Discount Allowed",
-                        "distinct_en_US": "Manual Discount Allowed||manualDiscountAllowed||Boolean",
-                        "type": "Boolean",
-                        "values": [
-                            {
-                                "valueBoolean": true,
-                                "value": "True",
-                                "flatLocale_localizedValue_en_US": "Yes",
-                                "distinct_en_US": "Yes||True",
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "Yes"
-                                    }
-                                ],
-                                "default": false
-                            }
-                        ]
-                    },
+                    
                     {
                         "name": "skipECPDDiscount",
                         "localizedName": [
@@ -1053,33 +505,7 @@ Response
                             }
                         ]
                     },
-                    {
-                        "name": "defaultDisplayFlag",
-                        "localizedName": [
-                            {
-                                "locale": "en-US",
-                                "value": "Default Display flag"
-                            }
-                        ],
-                        "flatLocale_localizedName_en_US": "Default Display flag",
-                        "distinct_en_US": "Default Display flag||defaultDisplayFlag||Boolean",
-                        "type": "Boolean",
-                        "values": [
-                            {
-                                "valueBoolean": false,
-                                "value": "False",
-                                "flatLocale_localizedValue_en_US": "No",
-                                "distinct_en_US": "No||False",
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "No"
-                                    }
-                                ],
-                                "default": false
-                            }
-                        ]
-                    },
+                    
                     {
                         "name": "devicePaymentConfigSetup",
                         "localizedName": [
@@ -1104,18 +530,7 @@ Response
                                 ],
                                 "default": false
                             },
-                            {
-                                "value": "1992ea5f-7756-40a7-b381-a29235e387ef",
-                                "flatLocale_localizedValue_en_US": "30 | 100 | 03 Jan 2021 05:00 AM UTC | 31 Dec 9999 05:00 AM UTC",
-                                "distinct_en_US": "30 | 100 | 03 Jan 2021 05:00 AM UTC | 31 Dec 9999 05:00 AM UTC||1992ea5f-7756-40a7-b381-a29235e387ef",
-                                "localizedValue": [
-                                    {
-                                        "locale": "en-US",
-                                        "value": "30 | 100 | 03 Jan 2021 05:00 AM UTC | 31 Dec 9999 05:00 AM UTC"
-                                    }
-                                ],
-                                "default": false
-                            },
+                            
                             {
                                 "value": "e873e64c-c2fc-4e16-8ec7-4ba526ded927",
                                 "flatLocale_localizedValue_en_US": "36 | 100 | 28 Jan 2022 05:00 AM UTC | 31 Dec 9999 05:00 AM UTC",
