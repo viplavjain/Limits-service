@@ -21,6 +21,58 @@ Request
 		}
 	]
 }
+public class JsonData {
+    private Context context;
+    private List<Id> ids;
+    private List<TraversalPath> traversalPath;
+
+    public Context getContext() {
+        return context;
+    }
+
+    public void setContext(Context context) {
+        this.context = context;
+    }
+
+    public List<Id> getIds() {
+        return ids;
+    }
+
+    public void setIds(List<Id> ids) {
+        this.ids = ids;
+    }
+
+    public List<TraversalPath> getTraversalPath() {
+        return traversalPath;
+    }
+
+    public void setTraversalPath(List<TraversalPath> traversalPath) {
+        this.traversalPath = traversalPath;
+    }
+
+    public static class Context {
+        private String level;
+        private String workstreamName;
+        private String user;
+
+        // Getters and setters for level, workstreamName, and user
+    }
+
+    public static class Id {
+        private String id;
+        private String type;
+
+        // Getters and setters for id and type
+    }
+
+    public static class TraversalPath {
+        private List<String> types;
+        private String direction;
+        private int depth;
+
+        // Getters and setters for types, direction, and depth
+    }
+}
 
 Response
 {
