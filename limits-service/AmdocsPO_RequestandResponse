@@ -674,3 +674,175 @@ Response
         "total": 0
     }
 }
+
+Response
+public class JsonToJava {
+
+    public static class Root {
+        public List<Document> documents;
+        public List<Object> relatedDocuments;
+        public List<List<Object>> relations;
+        public Object paths;
+        public Object cycles;
+        public Count count;
+        public RelatedCount relatedCount;
+    }
+
+    public static class Document {
+        public String entityType;
+        public DocumentMetaData documentMetaData;
+        public DocumentContent document;
+        public boolean deleted;
+    }
+
+    public static class DocumentMetaData {
+        public String lastModifiedDateTime;
+        public String lastModifiedUser;
+        public String documentID;
+        public String documentLevel;
+        public List<LocalizedValue> documentName;
+        public Object sharedStatus;
+        public String publishedStatus;
+        public Object productionStatus;
+        public String coreStatus;
+        public String businessEntityType;
+        public String originalEntityType;
+        public Object customEntityType;
+        public Object baseBusinessRequestID;
+        public Object mergeBusinessRequestID;
+        public Object rootID;
+        public Object rootEntityType;
+        public Object rootIndexType;
+        public Object baseStatus;
+        public Object code;
+    }
+
+    public static class DocumentContent {
+        public boolean isBundle;
+        public ProductSpecification productSpecification;
+        public String businessName;
+        public List<LocalizedValue> description;
+        public List<ProductOfferingCharacteristic> productOfferingCharacteristic;
+        public List<ProductOfferingPrice> productOfferingPrice;
+        public ProductOfferingType productOfferingType;
+        public List<Object> bundledProductOffering;
+        public Currency currency;
+        public List<Object> productOfferingTerm;
+        public List<Object> policy;
+        public List<Object> prodSpecCharValueUse;
+        public List<Characteristic> characteristics;
+        public List<Object> bundledProdOfferGroupOption;
+        public Object durationPolicy;
+        public ValidFor validFor;
+        public Object valueRank;
+        public List<ProductOfferingQualification> productOfferingQualification;
+        public List<ExternalId> externalId;
+        public Object version;
+        public boolean mustBeBundled;
+        public List<Object> productOfferingCompositePrice;
+        public List<Object> restriction;
+        public Object name;
+        public List<Object> relatedPartyRef;
+        public boolean primary;
+    }
+
+    public static class LocalizedValue {
+        public String locale;
+        public String value;
+    }
+
+    public static class ProductSpecification {
+        public String id;
+    }
+
+    public static class ProductOfferingCharacteristic {
+        public boolean allowProductOfferingOverride;
+        public boolean configurable;
+        public boolean expiredForSales;
+        public List<LocalizedValue> localizedName;
+        public int maxCardinality;
+        public int minCardinality;
+        public String name;
+        public String valueType;
+        public boolean variantGroupCharacteristic;
+        public List<ProductOfferingCharacteristicValue> productOfferingCharacteristicValue;
+        public List<Object> freeTextDefault;
+    }
+
+    public static class ProductOfferingCharacteristicValue {
+        public boolean isDefault;
+        public boolean expiredForSales;
+        public List<LocalizedValue> localizedValue;
+        public String value;
+        public List<SourceElementRef> sourceElementRef;
+    }
+
+    public static class SourceElementRef {
+        public String id;
+        public String type;
+        public String jsonPath;
+    }
+
+    public static class ProductOfferingPrice {
+        public String id;
+        public Object isPublic;
+    }
+
+    public static class ProductOfferingType {
+        public String id;
+    }
+
+    public static class Currency {
+        public String defaultCurrency;
+        public List<String> currencies;
+    }
+
+    public static class ValidFor {
+        public String startDateTime;
+        public String endDateTime;
+    }
+
+    public static class ProductOfferingQualification {
+        public String id;
+    }
+
+    public static class ExternalId {
+        public String id;
+        public String owner;
+        public String type;
+        public String uid;
+    }
+
+    public static class Characteristic {
+        public String name;
+        public List<LocalizedValue> localizedName;
+        public String flatLocale_localizedName_en_US;
+        public String distinct_en_US;
+        public String type;
+        public List<Value> values;
+    }
+
+    public static class Value {
+        @JsonProperty("valueBoolean")
+        public Boolean valueBoolean;
+        @JsonProperty("valueFloat")
+        public Float valueFloat;
+        @JsonProperty("valueInteger")
+        public Integer valueInteger;
+        @JsonProperty("valueDate")
+        public String valueDate;
+        public String value;
+        public List<LocalizedValue> localizedValue;
+        public boolean isDefault;
+    }
+
+    public static class Count {
+        public int total;
+        public int productoffering;
+    }
+
+    public static class RelatedCount {
+        public int total;
+    }
+}
+
