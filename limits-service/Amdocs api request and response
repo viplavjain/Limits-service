@@ -51,6 +51,356 @@ Search api request
 	},
 	"cacheResultID" : null
 }
+public class CombinedSearchRequest {
+
+    private Context context;
+    private Item item;
+    private ResponseFilter responseFilter;
+    private Object cacheResultID;
+
+    public static class Context {
+        private Stng workstreamName;
+        private String user;
+
+        // Getters and ring level;
+        private Strisetters
+        public String getLevel() {
+            return level;
+        }
+
+        public void setLevel(String level) {
+            this.level = level;
+        }
+
+        public String getWorkstreamName() {
+            return workstreamName;
+        }
+
+        public void setWorkstreamName(String workstreamName) {
+            this.workstreamName = workstreamName;
+        }
+
+        public String getUser() {
+            return user;
+        }
+
+        public void setUser(String user) {
+            this.user = user;
+        }
+    }
+
+    public static class Item {
+        private String type;
+        private List<Object> and;
+        private List<Object> not;
+        private List<OrCondition> or;
+        private Filter filter;
+
+        public static class OrCondition {
+            private String type;
+            private String text;
+            private String locale;
+            private List<String> types;
+            private Criteria criteria;
+
+            public static class Criteria {
+                private FilterCondition filterCondition;
+
+                public static class FilterCondition {
+                    private String type;
+                    private String path;
+                    private Condition condition;
+
+                    public static class Condition {
+                        private String type;
+                        private String field;
+                        private List<String> values;
+
+                        // Getters and setters
+                        public String getType() {
+                            return type;
+                        }
+
+                        public void setType(String type) {
+                            this.type = type;
+                        }
+
+                        public String getField() {
+                            return field;
+                        }
+
+                        public void setField(String field) {
+                            this.field = field;
+                        }
+
+                        public List<String> getValues() {
+                            return values;
+                        }
+
+                        public void setValues(List<String> values) {
+                            this.values = values;
+                        }
+                    }
+
+                    // Getters and setters
+                    public String getType() {
+                        return type;
+                    }
+
+                    public void setType(String type) {
+                        this.type = type;
+                    }
+
+                    public String getPath() {
+                        return path;
+                    }
+
+                    public void setPath(String path) {
+                        this.path = path;
+                    }
+
+                    public Condition getCondition() {
+                        return condition;
+                    }
+
+                    public void setCondition(Condition condition) {
+                        this.condition = condition;
+                    }
+                }
+
+                // Getters and setters
+                public FilterCondition getFilterCondition() {
+                    return filterCondition;
+                }
+
+                public void setFilterCondition(FilterCondition filterCondition) {
+                    this.filterCondition = filterCondition;
+                }
+            }
+
+            // Getters and setters
+            public String getType() {
+                return type;
+            }
+
+            public void setType(String type) {
+                this.type = type;
+            }
+
+            public String getText() {
+                return text;
+            }
+
+            public void setText(String text) {
+                this.text = text;
+            }
+
+            public String getLocale() {
+                return locale;
+            }
+
+            public void setLocale(String locale) {
+                this.locale = locale;
+            }
+
+            public List<String> getTypes() {
+                return types;
+            }
+
+            public void setTypes(List<String> types) {
+                this.types = types;
+            }
+
+            public Criteria getCriteria() {
+                return criteria;
+            }
+
+            public void setCriteria(Criteria criteria) {
+                this.criteria = criteria;
+            }
+        }
+
+        public static class Filter {
+            private String type;
+            private List<Object> or;
+            private List<AndCondition> and;
+            private List<Object> not;
+
+            public static class AndCondition {
+                private String type;
+                private List<InCondition> and;
+
+                public static class InCondition {
+                    private String type;
+                    private String field;
+                    private List<String> values;
+
+                    // Getters and setters
+                    public String getType() {
+                        return type;
+                    }
+
+                    public void setType(String type) {
+                        this.type = type;
+                    }
+
+                    public String getField() {
+                        return field;
+                    }
+
+                    public void setField(String field) {
+                        this.field = field;
+                    }
+
+                    public List<String> getValues() {
+                        return values;
+                    }
+
+                    public void setValues(List<String> values) {
+                        this.values = values;
+                    }
+                }
+
+                // Getters and setters
+                public String getType() {
+                    return type;
+                }
+
+                public void setType(String type) {
+                    this.type = type;
+                }
+
+                public List<InCondition> getAnd() {
+                    return and;
+                }
+
+                public void setAnd(List<InCondition> and) {
+                    this.and = and;
+                }
+            }
+
+            // Getters and setters
+            public String getType() {
+                return type;
+            }
+
+            public void setType(String type) {
+                this.type = type;
+            }
+
+            public List<Object> getOr() {
+                return or;
+            }
+
+            public void setOr(List<Object> or) {
+                this.or = or;
+            }
+
+            public List<AndCondition> getAnd() {
+                return and;
+            }
+
+            public void setAnd(List<AndCondition> and) {
+                this.and = and;
+            }
+
+            public List<Object> getNot() {
+                return not;
+            }
+
+            public void setNot(List<Object> not) {
+                this.not = not;
+            }
+        }
+
+        // Getters and setters
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public List<Object> getAnd() {
+            return and;
+        }
+
+        public void setAnd(List<Object> and) {
+            this.and = and;
+        }
+
+        public List<Object> getNot() {
+            return not;
+        }
+
+        public void setNot(List<Object> not) {
+            this.not = not;
+        }
+
+        public List<OrCondition> getOr() {
+            return or;
+        }
+
+        public void setOr(List<OrCondition> or) {
+            this.or = or;
+        }
+
+        public Filter getFilter() {
+            return filter;
+        }
+
+        public void setFilter(Filter filter) {
+            this.filter = filter;
+        }
+    }
+
+    public static class ResponseFilter {
+        private List<String> includeFields;
+
+        // Getters and setters
+        public List<String> getIncludeFields() {
+            return includeFields;
+        }
+
+        public void setIncludeFields(List<String> includeFields) {
+            this.includeFields = includeFields;
+        }
+    }
+
+    // Getters and setters
+    public Context getContext() {
+        return context;
+    }
+
+    public void setContext(Context context) {
+        this.context = context;
+    }
+
+    public Item getItem() {
+        return item;
+    }
+
+    public void setItem(Item item) {
+        this.item = item;
+    }
+
+    public ResponseFilter getResponseFilter() {
+        return responseFilter;
+    }
+
+    public void setResponseFilter(ResponseFilter responseFilter) {
+        this.responseFilter = responseFilter;
+    }
+
+    public Object getCacheResultID() {
+        return cacheResultID;
+    }
+
+    public void setCacheResultID(Object cacheResultID) {
+        this.cacheResultID = cacheResultID;
+    }
+}
 *******************Response*****************************
 {
     "type": "CombinedDocumentsSearchResponse",
