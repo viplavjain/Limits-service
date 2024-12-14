@@ -1,0 +1,55 @@
+curl --location 'https://catalogone-apigw-qa1b-at-npge.ebiz.verizon.com/entitySearchServices/v1/search/combined' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: ••••••' \
+--data '{
+	"context" : {
+		"level" : "PUBLISHED",
+		"workstreamName" : "production",
+		"user" : "epc_user"
+	},
+	"item" : {
+		"type" : "CombinedSearchItem",
+		"and" : [],
+		"not" : [],
+		"or" : [{
+				"type" : "IdentifierSearchItem",
+				"text" : "\"MU6F3LL/A\"",
+				"locale" : "en-US",
+				"types" : ["productoffering"]
+			}, {
+				"types" : ["productoffering"],
+				"type" : "CriteriaSearchItem",
+				"criteria" : {
+					"filterCondition" : {
+						"type" : "NestedCondition",
+						"path" : "document.externalId",
+						"condition" : {
+							"type" : "InCondition",
+							"field" : "document.externalId.id",
+							"values" : ["MU6F3LL/A"]
+						}
+					}
+				}
+			}
+		],
+		"filter" : {
+			"type" : "BooleanCondition",
+			"or" : [],
+			"and" : [{
+					"type" : "BooleanCondition",
+					"and" : [{
+							"type" : "InCondition",
+							"field" : "documentMetaData.businessEntityType",
+							"values" : ["productOffering"]
+						}
+					]
+				}
+			],
+			"not" : []
+		}
+	},
+	"responseFilter" : {
+		"includeFields" : ["documentMetaData.documentID"]
+	},
+	"cacheResultID" : null
+}'
