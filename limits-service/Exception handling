@@ -1,0 +1,54 @@
+public class DeviceServiceException extends RuntimeException {
+    public DeviceServiceException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+--------------------------------------
+@Service
+public class DeviceService {
+
+    @Autowired
+    private DMDGetDataService dmdGetDataService;
+
+    @Autowired
+    private DPIGetDataService dpiGetDataService;
+
+    public Flux<HashMap<String, Object>> fetchAllData(String sorId) {
+        return Flux.zip(
+                handleServiceCall(() -> dmdGetDataService.getDMDDeviceDetails("dmd", "LG-VX4400BM", "device")),
+                handleServiceCall(() -> dpiGetDataService.getDPIDeviceDetails("dpi", "ADR6400LVW", "device"))
+        )
+        .map(results -> {
+            HashMap<String, Object> resultMap = new HashMap<>();
+            resultMap.put("dmdAPI", results.getT1());
+            resultMap.put("dpiAPI", results.getT2());
+            return resultMap;
+        });
+    }
+
+    private <T> Mono<T> handleServiceCall(Supplier<Mono<T>> serviceCall) {
+        return serviceCall.get().onErrorResume(ex -> {
+            throw new DeviceServiceException("Service call failed: " + ex.getMessage(), ex);
+        });
+    }
+}
+-------------------------------------------------------------------------
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(DeviceServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleDeviceServiceException(DeviceServiceException ex) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("error", "Device Service Error");
+        errorResponse.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("error", "Unexpected Error");
+        errorResponse.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+}
