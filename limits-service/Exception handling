@@ -1,11 +1,62 @@
-public class DeviceServiceException extends RuntimeException {
-    public DeviceServiceException(String message, Throwable cause) {
-        super(message, cause);
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.server.ServerWebInputException;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@ControllerAdvice
+public class GlobalExceptionHandler {
+
+    // Handle custom application exceptions
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<Map<String, Object>> handleAppException(AppException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", ex.getMessage());
+        response.put("details", ex.getDetails());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    // Handle web exceptions (e.g., invalid input)
+    @ExceptionHandler(ServerWebInputException.class)
+    public ResponseEntity<Map<String, Object>> handleWebInputException(ServerWebInputException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "Invalid request parameter");
+        response.put("details", ex.getReason());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    // Handle generic exceptions
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGeneralException(Exception ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "Internal server error");
+        response.put("details", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }
---------------------------------------
+---------------------------------------------------------------------------------------------------
+public class AppException extends RuntimeException {
+    private final String details;
+
+    public AppException(String message, String details) {
+        super(message);
+        this.details = details;
+    }
+
+    public String getDetails() {
+        return details;
+    }
+}
+----------------------------------------------------------------------------------------
+import reactor.core.publisher.Mono;
+import java.util.HashMap;
+import java.util.List;
+
 @Service
-public class DeviceService {
+public class DataAggregationService {
 
     @Autowired
     private DMDGetDataService dmdGetDataService;
@@ -13,42 +64,22 @@ public class DeviceService {
     @Autowired
     private DPIGetDataService dpiGetDataService;
 
-    public Flux<HashMap<String, Object>> fetchAllData(String sorId) {
-        return Flux.zip(
-                handleServiceCall(() -> dmdGetDataService.getDMDDeviceDetails("dmd", "LG-VX4400BM", "device")),
-                handleServiceCall(() -> dpiGetDataService.getDPIDeviceDetails("dpi", "ADR6400LVW", "device"))
-        )
-        .map(results -> {
-            HashMap<String, Object> resultMap = new HashMap<>();
-            resultMap.put("dmdAPI", results.getT1());
-            resultMap.put("dpiAPI", results.getT2());
-            return resultMap;
-        });
-    }
+    public Mono<HashMap<String, Object>> fetchAllData(String sorId) {
+        // Validate input
+        if (sorId == null || sorId.isEmpty()) {
+            throw new AppException("Invalid sorId", "sorId cannot be null or empty");
+        }
 
-    private <T> Mono<T> handleServiceCall(Supplier<Mono<T>> serviceCall) {
-        return serviceCall.get().onErrorResume(ex -> {
-            throw new DeviceServiceException("Service call failed: " + ex.getMessage(), ex);
-        });
-    }
-}
--------------------------------------------------------------------------
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(DeviceServiceException.class)
-    public ResponseEntity<Map<String, Object>> handleDeviceServiceException(DeviceServiceException ex) {
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("error", "Device Service Error");
-        errorResponse.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-    }
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("error", "Unexpected Error");
-        errorResponse.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        return Mono.zip(
+                dmdGetDataService.getDMDDeviceDetails(DeviceConstants.DMD, DeviceConstants.DMD_SORID, DeviceConstants.DEVICE).collectList(),
+                dpiGetDataService.getDPIDeviceDetails(DeviceConstants.DPI, DeviceConstants.DPI_SORID, DeviceConstants.DEVICE).collectList()
+            )
+            .map(results -> {
+                HashMap<String, Object> resultMap = new HashMap<>();
+                resultMap.put(DeviceConstants.DMD, results.getT1());
+                resultMap.put(DeviceConstants.DPI, results.getT2());
+                return resultMap;
+            })
+            .onErrorMap(e -> new AppException("Data fetch error", e.getMessage())); // Convert runtime exceptions to AppException
     }
 }
