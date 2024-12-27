@@ -1,0 +1,48 @@
+public class FeaturePackageAcceptRequest {
+    @JsonProperty
+    List<PackageProductsModel> data;
+    @JsonProperty
+    List<PackageProductsModel> dataNew;
+}
+---------------------------------------------------------
+@JsonInclude(Include.NON_NULL)
+@JsonIgnoreProperties(
+    ignoreUnknown = true
+)
+public class PackageProductsModel implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private Long seqId;
+    private Long packageSeqId;
+    private String productType;
+    private String productId;
+    private String dpcGroup;
+    private String dpcItem;
+    private String rateElement;
+    private String deltaAction;
+    private String slcProdClsCd;
+    private String dbUserId;
+    private String dbTimestamp;
+    private String taxChargeTyp;
+    private String prodSvcAttrCd;
+    private String prodNme;
+    private String prodStat;
+    private String geoCdTyp;
+    private String qtyUnit;
+    private String introDt;
+    private String endDt;
+    private String priceTyp;
+    private String prntCatCd;
+    private String finGroupCd;
+    private String prodBlLevelCd;
+    private String prodAllocCd;
+    private String whslBillingCd;
+    private String occInd;
+    private String etfInd;
+    private String rateElementDescription;
+    private String dpcGroupDescription;
+    private String dpcItemDescription;
+    private String slcProdClsDescription;
+    private String taxChargeTypDescription;
+    private String prodSvcAttrDescription;
+------------------------------------------------------------------------------
+"{\r\n\"data\": [\r\n{\r\n            \"dpcGroup\":\"7002\",\r\n\t\t\t\"dpcItem\" :\"004\"\r\n        }\r\n    ],\r\n    \"dataNew\": [\r\n        {\r\n            \"dpcGroup\":\"7002\",\r\n\t\t\t\"dpcItem\" :\"004\"\r\n        }\r\n    ]\r\n}"
