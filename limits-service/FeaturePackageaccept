@@ -8,3 +8,21 @@ List<PackageProductsModel> data = featurePackageAcceptRequest.getData();
                 data.add(model);
             }
         }
+-----------------------------------------------------------------------
+List<PackageProductsModel> data = featurePackageAcceptRequest.getData();
+List<PackageProductsModel> dataNew = featurePackageAcceptRequest.getDataNew();
+
+dataNew.forEach(newProduct -> {
+    int index = IntStream.range(0, data.size())
+            .filter(i -> Objects.equals(data.get(i).getProductId(), newProduct.getProductId()))
+            .findFirst()
+            .orElse(-1);
+
+    if (index != -1) {
+        // Product with matching productId found at index 'index' in 'data' list
+        // Do something with the index (e.g., update the existing product)
+    } else {
+        // Product not found in 'data' list
+        data.add(newProduct);
+    }
+});
