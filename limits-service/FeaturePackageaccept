@@ -1,0 +1,10 @@
+List<PackageProductsModel> data = featurePackageAcceptRequest.getData();
+        List<PackageProductsModel> dataNew = featurePackageAcceptRequest.getDataNew();
+
+        validate(errorResponse,dataNew);
+        for(PackageProductsModel model : dataNew) {
+            boolean exists= data.stream().anyMatch(p-> Objects.equals(p.getProductId(), model.getProductId())) ;
+            if(!exists){
+                data.add(model);
+            }
+        }
