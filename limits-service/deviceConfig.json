@@ -40,6 +40,72 @@
             }
           ]
         }
+ -----------------------------------------------------------------------------------------
+ import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+
+public class JsonProcessor {
+    public static void main(String[] args) {
+        try {
+            // Load JSON file from the resources folder
+            InputStream inputStream = JsonProcessor.class.getClassLoader().getResourceAsStream("device.json");
+            if (inputStream == null) {
+                throw new RuntimeException("File device.json not found in resources folder");
+            }
+
+            // Parse JSON file using ObjectMapper
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode root = objectMapper.readTree(inputStream);
+
+            // Example epcMap
+            Map<String, String> epcMap = new HashMap<>();
+            epcMap.put("displayName", "SomeValue");
+
+            // Map to hold genericKeyMap
+            Map<String, String> genericKeyMap = new HashMap<>();
+
+            // Extract devices
+            JsonNode devices = root.at("/items/device");
+            if (devices.isArray()) {
+                for (JsonNode device : devices) {
+                    String genericKey = device.get("genericKey").asText();
+                    JsonNode authorization = device.at("/details/Authorization");
+                    if (authorization.isArray()) {
+                        for (JsonNode auth : authorization) {
+                            String key = auth.get("key").asText();
+                            if (!key.isEmpty()) {
+                                genericKeyMap.put(key, genericKey);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Update epcMap with genericKeyMap
+            for (Iterator<Map.Entry<String, String>> it = epcMap.entrySet().iterator(); it.hasNext(); ) {
+                Map.Entry<String, String> entry = it.next();
+                String key = entry.getKey();
+                if (genericKeyMap.containsKey(key)) {
+                    String newKey = genericKeyMap.get(key);
+                    String value = entry.getValue();
+                    it.remove(); // Remove old key
+                    epcMap.put(newKey, value); // Add new key-value pair
+                }
+            }
+
+            // Print the updated epcMap
+            System.out.println("Updated epcMap: " + epcMap);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+       
       }
     ]
   }
