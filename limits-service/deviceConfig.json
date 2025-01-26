@@ -1,0 +1,46 @@
+{
+  "items": {
+    "device": [
+      {
+        "genericKey": "prodName",
+        "details": {
+          "source": [
+            {
+              "system": "DMD",
+              "key": "prodName",
+              "value": ""
+            }
+          ],
+          "Authorization": [
+            {
+              "system": "EPC",
+              "key": "displayName",
+              "value": ""
+            }
+          ],
+          "Persistence": [
+            {
+              "system": "Cassandra",
+              "key": "",
+              "value": ""
+            }
+          ],
+          "Cache": [
+            {
+              "system": "Redis",
+              "key": "",
+              "value": ""
+            }
+          ],
+          "Destination": [
+            {
+              "system": "Fusion",
+              "key": "",
+              "value": ""
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
