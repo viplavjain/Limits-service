@@ -110,3 +110,89 @@ public class JsonProcessor {
     ]
   }
 }
+-------------------------------------------------------------------------------------------
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
+
+public class DeviceDTOMapper {
+
+    public static class DeviceDTO {
+        private String deviceName;
+        private int deviceId;
+        private boolean isActive;
+
+        // Getters and Setters
+        public String getDeviceName() {
+            return deviceName;
+        }
+
+        public void setDeviceName(String deviceName) {
+            this.deviceName = deviceName;
+        }
+
+        public int getDeviceId() {
+            return deviceId;
+        }
+
+        public void setDeviceId(int deviceId) {
+            this.deviceId = deviceId;
+        }
+
+        public boolean isActive() {
+            return isActive;
+        }
+
+        public void setActive(boolean active) {
+            isActive = active;
+        }
+
+        @Override
+        public String toString() {
+            return "DeviceDTO{" +
+                    "deviceName='" + deviceName + '\'' +
+                    ", deviceId=" + deviceId +
+                    ", isActive=" + isActive +
+                    '}';
+        }
+    }
+
+    public static DeviceDTO mapToDeviceDTO(Map<String, Object> map) throws IllegalAccessException {
+        DeviceDTO deviceDTO = new DeviceDTO();
+        Class<?> clazz = deviceDTO.getClass();
+
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            try {
+                // Check if the field exists in the class
+                Field field = clazz.getDeclaredField(key);
+
+                // Make the field accessible
+                field.setAccessible(true);
+
+                // Set the value of the field
+                field.set(deviceDTO, value);
+            } catch (NoSuchFieldException e) {
+                // Ignore fields that do not exist in the class
+            }
+        }
+
+        return deviceDTO;
+    }
+
+    public static void main(String[] args) throws IllegalAccessException {
+        // Example input HashMap
+        Map<String, Object> inputMap = new HashMap<>();
+        inputMap.put("deviceName", "Router");
+        inputMap.put("deviceId", 101);
+        inputMap.put("isActive", true);
+        inputMap.put("unknownField", "This will be ignored");
+
+        // Map to DeviceDTO
+        DeviceDTO deviceDTO = mapToDeviceDTO(inputMap);
+        System.out.println(deviceDTO);
+    }
+}
+
