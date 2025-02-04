@@ -58,3 +58,59 @@ public Mono<DeviceEpcDto> getEPCDeviceDetails(String sorId,String env) throws Js
 
 
     }
+
+-------------------------Updated code----------------------------------------------------
+public Mono<DeviceEpcDto> getEPCDeviceDetails(String sorId, String env) throws JsonProcessingException {
+    log.info("getEPCDeviceDetails API called");
+
+    return tokenService.getToken(env).flatMap(token -> {
+        String bearerToken = CommonConstants.BEARER + token.getToken();
+
+        // Create requests ONCE and CLONE them for subsequent modifications
+        AmdocsSearchRequest amdocsSearchRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_DOCUMENT_SEARCH_JSON, AmdocsSearchRequest.class);
+        amdocsSearchRequest.getItem().getOr().get(0).setText("\"" + sorId + "\"");
+
+        ProductOfferingRequest productOfferingRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFER_JSON, ProductOfferingRequest.class);
+        ProductOfferingRequest productSpecificationSkuRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class); // For SKU
+        ProductOfferingRequest productSpecificationPrdRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class); // For PRD
+
+
+        return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsSearchApi(env), amdocsSearchRequest, AmdocsSearchResponse.class)
+            .flatMap(searchResponse -> {
+                String documentID = searchResponse.getDocuments().get(0).getDocumentMetaData().getDocumentID();
+                productOfferingRequest.getIds().get(0).setId(documentID);
+
+                return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsProductApi(env), productOfferingRequest, ProductOfferingResponse.class)
+                    .flatMap(poResponse -> {
+                        String productSpecificationId = poResponse.getDocuments().get(0).getDocument().getProductSpecification().getId();
+                        productSpecificationSkuRequest.getIds().get(0).setId(productSpecificationId); // Set SKU ID
+                        productSpecificationPrdRequest.getIds().get(0).setId(productSpecificationId); //Set initial PRD ID (might be overridden)
+
+                        Mono<ProductOfferingResponse> monoProductSpecificationSkuResponse = genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsProductApi(env), productSpecificationSkuRequest, ProductOfferingResponse.class);
+
+                        Mono<ProductOfferingResponse> monoProductSpecificationPrdResponse = Mono.just(new ProductOfferingResponse()); // Initialize with an empty response
+
+
+                        if (poResponse.getDocuments().get(0).getDocument().getBundledProductSpecification() != null) {
+                            String bundledProductId = poResponse.getDocuments().get(0).getDocument().getBundledProductSpecification().get(0).getId();
+                            productSpecificationPrdRequest.getIds().get(0).setId(bundledProductId); // Override with bundled product ID
+
+                            monoProductSpecificationPrdResponse = genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsProductApi(env), productSpecificationPrdRequest, ProductOfferingResponse.class);
+                        }
+
+                        return Mono.zip(monoProductOfferingResponse, monoProductSpecificationSkuResponse, monoProductSpecificationPrdResponse)
+                            .map(tuple -> {
+                                HashMap<String, Object> responseMap = new HashMap<>();
+                                responseMap.put(AmdocsConstants.PRODUCT_OFFER, tuple.getT1());
+                                responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_SKU, tuple.getT2());
+                                responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_PRD, tuple.getT3());
+                                try {
+                                    return returnDeviceEpcDTO(responseMap);
+                                } catch (IllegalAccessException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            });
+                    });
+            });
+    });
+}
