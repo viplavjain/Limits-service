@@ -114,3 +114,77 @@ public Mono<DeviceEpcDto> getEPCDeviceDetails(String sorId, String env) throws J
             });
     });
 }
+
+--------------------Updated code from chatgpt------------------------------------------------
+public Mono<DeviceEpcDto> getEPCDeviceDetails(String sorId, String env) throws JsonProcessingException {
+    log.info("getEPCDeviceDetails API called");
+    
+    Mono<Token> tokenMono = tokenService.getToken(env);
+    AmdocsSearchRequest amdocsSearchRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_DOCUMENT_SEARCH_JSON, AmdocsSearchRequest.class);
+    amdocsSearchRequest.getItem().getOr().get(0).setText("\"" + sorId + "\"");
+
+    ProductOfferingRequest productOfferingRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFER_JSON, ProductOfferingRequest.class);
+    ProductOfferingRequest productSpecificationRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class);
+
+    return tokenMono.flatMap(token -> {
+        String bearerToken = CommonConstants.BEARER + token.getToken();
+
+        // Call the search API
+        Mono<AmdocsSearchResponse> monoSearchResponse = genericWebClient.callPostApi(bearerToken,
+                epcConfiguration.getAmdocsSearchApi(env), amdocsSearchRequest, AmdocsSearchResponse.class);
+
+        return monoSearchResponse.flatMap(searchResponse -> {
+            String documentID = searchResponse.getDocuments().get(0).getDocumentMetaData().getDocumentID();
+            productOfferingRequest.getIds().get(0).setId(documentID);
+
+            // Call the product offering API
+            Mono<ProductOfferingResponse> monoProductOfferingResponse = genericWebClient.callPostApi(bearerToken,
+                    epcConfiguration.getAmdocsProductApi(env), productOfferingRequest, ProductOfferingResponse.class);
+
+            return monoProductOfferingResponse.flatMap(poResponse -> {
+                String productSpecificationId = poResponse.getDocuments().get(0).getDocument().getProductSpecification().getId();
+                productSpecificationRequest.getIds().get(0).setId(productSpecificationId);
+
+                // Call the product specification API
+                Mono<ProductOfferingResponse> monoProductSpecificationSkuResponse = genericWebClient.callPostApi(bearerToken,
+                        epcConfiguration.getAmdocsProductApi(env), productSpecificationRequest, ProductOfferingResponse.class);
+
+                return monoProductSpecificationSkuResponse.flatMap(psskuResponse -> {
+                    if (psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification() != null) {
+                        String bundledProductId = psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification().get(0).getId();
+                        productSpecificationRequest.getIds().get(0).setId(bundledProductId);
+
+                        // Call API for bundled product specification
+                        Mono<ProductOfferingResponse> monoProductSpecificationPrdResponse = genericWebClient.callPostApi(bearerToken,
+                                epcConfiguration.getAmdocsProductApi(env), productSpecificationRequest, ProductOfferingResponse.class);
+
+                        return zipAndTransformResponse(monoProductOfferingResponse, monoProductSpecificationSkuResponse, monoProductSpecificationPrdResponse);
+                    } else {
+                        // If no bundled product, pass an empty response
+                        return zipAndTransformResponse(monoProductOfferingResponse, monoProductSpecificationSkuResponse, Mono.just(new ProductOfferingResponse()));
+                    }
+                });
+            });
+        });
+    });
+}
+
+private Mono<DeviceEpcDto> zipAndTransformResponse(
+        Mono<ProductOfferingResponse> monoProductOfferingResponse,
+        Mono<ProductOfferingResponse> monoProductSpecificationSkuResponse,
+        Mono<ProductOfferingResponse> monoProductSpecificationPrdResponse) {
+
+    return Mono.zip(monoProductOfferingResponse, monoProductSpecificationSkuResponse, monoProductSpecificationPrdResponse)
+            .map(tuple -> {
+                HashMap<String, Object> responseMap = new HashMap<>();
+                responseMap.put(AmdocsConstants.PRODUCT_OFFER, tuple.getT1());
+                responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_SKU, tuple.getT2());
+                responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_PRD, tuple.getT3());
+                try {
+                    return returnDeviceEpcDTO(responseMap);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+}
+
