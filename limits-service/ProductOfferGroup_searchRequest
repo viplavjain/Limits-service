@@ -1,0 +1,50 @@
+{
+  "context" : {
+    "level" : "PUBLISHED",
+    "workstreamName" : "production",
+    "businessRequestID" : null,
+    "user" : "kumaay7",
+    "types" : ["productOfferingGroup","genericelement"],
+    "securityFilter" : "DATA"
+  },
+  "item" : {
+    "type" : "CombinedSearchItem",
+    "or" : [{
+      "type" : "TraversalIDsSearchItem",
+      "ids" : [{
+        "id" : "791ae975-4531-47cd-b65f-ed3f91c92a85",
+        "type" : "productoffering"
+      }
+      ],
+      "findPaths" : 64,
+      "traversalPath" : [{
+        "direction" : "up",
+        "depth" : 1,
+        "relationTypes" : ["productOfferingsInGroup"],
+        "types" : ["productofferinggroup"]
+      }
+      ],
+      "includeDocuments" : true
+    }, {
+      "type" : "TraversalIDsSearchItem",
+      "ids" : [{
+        "id" : "791ae975-4531-47cd-b65f-ed3f91c92a85",
+        "type" : "productoffering"
+      }
+      ],
+      "findPaths" : 64,
+      "traversalPath" : [{
+        "direction" : "up",
+        "depth" : 64,
+        "relationTypes" : ["groupCriteria"],
+        "types" : ["productofferinggroup"]
+      }
+      ],
+      "includeDocuments" : true
+    }
+    ]
+  },
+  "responseFilter" : {
+    "includeFields" : ["documentMetaData.businessEntityType", "documentMetaData.documentID"]
+  }
+}
