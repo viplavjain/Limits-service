@@ -48,3 +48,66 @@
     "includeFields" : ["documentMetaData.businessEntityType", "documentMetaData.documentID"]
   }
 }
+------------jsonEntity-------------------
+import lombok.Getter;
+import lombok.Setter;
+import java.util.List;
+
+@Getter
+@Setter
+public class SearchRequest {
+    private Context context;
+    private Item item;
+    private ResponseFilter responseFilter;
+}
+
+@Getter
+@Setter
+class Context {
+    private String level;
+    private String workstreamName;
+    private String businessRequestID;
+    private String user;
+    private List<String> types;
+    private String securityFilter;
+}
+
+@Getter
+@Setter
+class Item {
+    private String type;
+    private List<TraversalIDsSearchItem> or;
+}
+
+@Getter
+@Setter
+class TraversalIDsSearchItem {
+    private String type;
+    private List<ID> ids;
+    private int findPaths;
+    private List<TraversalPath> traversalPath;
+    private boolean includeDocuments;
+}
+
+@Getter
+@Setter
+class ID {
+    private String id;
+    private String type;
+}
+
+@Getter
+@Setter
+class TraversalPath {
+    private String direction;
+    private int depth;
+    private List<String> relationTypes;
+    private List<String> types;
+}
+
+@Getter
+@Setter
+class ResponseFilter {
+    private List<String> includeFields;
+}
+
