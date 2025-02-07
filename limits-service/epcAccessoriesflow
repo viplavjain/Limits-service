@@ -1,0 +1,6 @@
+Accessories --> Sor id in externalId po fetch using search api --> get the c1 id of po
+     - do po json fetch
+     - get the ps/pop c1 id in the productOffering json
+     - do ps json fetch / price or pop json fetch
+     - search api to get pog c1 id by passing po c1 id
+     - do pog json fetch
