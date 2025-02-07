@@ -172,122 +172,121 @@ public Mono<DeviceEpcDto> getEPCDeviceDetails(String sorId, String env) throws J
 
 --------------------Updated code from chatgpt------------------------------------------------
 public Mono<DeviceEpcDto> getEPCDeviceDetails(String sorId, String env) throws JsonProcessingException {
-    log.info("getEPCDeviceDetails API called");
+        log.info("getEPCDeviceDetails API called");
 
-    Mono<Token> tokenMono = tokenService.getToken(env);
-    AmdocsSearchRequest amdocsSearchRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_DOCUMENT_SEARCH_JSON, AmdocsSearchRequest.class);
-    amdocsSearchRequest.getItem().getOr().get(0).setText("\"" + sorId + "\"");
+        Mono<Token> tokenMono = tokenService.getToken(env);
+        AmdocsSearchRequest amdocsSearchRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_DOCUMENT_SEARCH_JSON, AmdocsSearchRequest.class);
+        amdocsSearchRequest.getItem().getOr().get(0).setText("\"" + sorId + "\"");
 
-    ProductOfferingRequest productOfferingRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFER_JSON, ProductOfferingRequest.class);
-    ProductOfferingRequest productSpecificationRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class);
-    ProductOfferingRequest productOfferingGroupRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFERGROUP_JSON, ProductOfferingRequest.class);
-    ProductOfferingGroupSearchRequest productOfferingGroupSearchRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFERGROUP_SEARCH_JSON, ProductOfferingGroupSearchRequest.class);
+        ProductOfferingRequest productOfferingRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFER_JSON, ProductOfferingRequest.class);
+        ProductOfferingRequest productSpecificationRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class);
+        ProductOfferingRequest productOfferingGroupRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFERGROUP_JSON, ProductOfferingRequest.class);
+        ProductOfferingGroupSearchRequest productOfferingGroupSearchRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFERGROUP_SEARCH_JSON, ProductOfferingGroupSearchRequest.class);
 
-    return tokenMono.flatMap(token -> {
-        String bearerToken = CommonConstants.BEARER + token.getToken();
+        return tokenMono.flatMap(token -> {
+            String bearerToken = CommonConstants.BEARER + token.getToken();
 
-        return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsSearchApi(env), amdocsSearchRequest, AmdocsSearchResponse.class)
-            .flatMap(searchResponse -> {
-                String documentID = searchResponse.getDocuments().get(0).getDocumentMetaData().getDocumentID();
-                productOfferingRequest.getIds().get(0).setId(documentID);
+            return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsSearchApi(env), amdocsSearchRequest, AmdocsSearchResponse.class)
+                    .flatMap(searchResponse -> {
+                        String documentID = searchResponse.getDocuments().get(0).getDocumentMetaData().getDocumentID();
+                        productOfferingRequest.getIds().get(0).setId(documentID);
 
-                return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsProductApi(env), productOfferingRequest, ProductOfferingResponse.class);
-            })
-            .flatMap(poResponse -> {
-                String productSpecificationId = poResponse.getDocuments().get(0).getDocument().getProductSpecification().getId();
-                productSpecificationRequest.getIds().get(0).setId(productSpecificationId);
+                        return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsProductApi(env), productOfferingRequest, ProductOfferingResponse.class);
+                    })
+                    .flatMap(poResponse -> {
+                        String productSpecificationId = poResponse.getDocuments().get(0).getDocument().getProductSpecification().getId();
+                        productSpecificationRequest.getIds().get(0).setId(productSpecificationId);
 
-                Mono<ProductOfferingResponse> monoProductSpecificationSkuResponse = genericWebClient.callPostApi(
-                        bearerToken, epcConfiguration.getAmdocsProductApi(env), productSpecificationRequest, ProductOfferingResponse.class
-                );
-
-                return monoProductSpecificationSkuResponse.flatMap(psskuResponse -> {
-                    if (psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification() != null) {
-                        String bundledProductId = psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification().get(0).getId();
-                        ProductOfferingRequest productSpecificationPrdRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class);
-                        productSpecificationPrdRequest.getIds().get(0).setId(bundledProductId);
-
-                        Mono<ProductOfferingResponse> monoProductSpecificationPrdResponse = genericWebClient.callPostApi(
-                                bearerToken, epcConfiguration.getAmdocsProductApi(env), productSpecificationPrdRequest, ProductOfferingResponse.class
+                        Mono<ProductOfferingResponse> monoProductSpecificationSkuResponse = genericWebClient.callPostApi(
+                                bearerToken, epcConfiguration.getAmdocsProductApi(env), productSpecificationRequest, ProductOfferingResponse.class
                         );
 
-                        return fetchProductOfferingGroup(bearerToken, poResponse, productOfferingGroupSearchRequest, productOfferingGroupRequest)
-                                .flatMap(monoProductOfferingGroupResponse ->
-                                        zipAndTransformResponse(poResponse, monoProductSpecificationSkuResponse, monoProductSpecificationPrdResponse, monoProductOfferingGroupResponse)
+                        return monoProductSpecificationSkuResponse.flatMap(psskuResponse -> {
+                            if (psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification() != null) {
+                                String bundledProductId = psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification().get(0).getId();
+                                ProductOfferingRequest productSpecificationPrdRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class);
+                                productSpecificationPrdRequest.getIds().get(0).setId(bundledProductId);
+
+                                Mono<ProductOfferingResponse> monoProductSpecificationPrdResponse = genericWebClient.callPostApi(
+                                        bearerToken, epcConfiguration.getAmdocsProductApi(env), productSpecificationPrdRequest, ProductOfferingResponse.class
                                 );
-                    } else {
-                        return fetchProductOfferingGroup(bearerToken, poResponse, productOfferingGroupSearchRequest, productOfferingGroupRequest)
-                                .flatMap(monoProductOfferingGroupResponse ->
-                                        zipAndTransformResponse(poResponse, monoProductSpecificationSkuResponse, Mono.just(new ProductOfferingResponse()), monoProductOfferingGroupResponse)
-                                );
+
+                                return fetchProductOfferingGroup(bearerToken, poResponse, productOfferingGroupSearchRequest, productOfferingGroupRequest,env)
+                                        .flatMap(monoProductOfferingGroupResponse ->
+                                                zipAndTransformResponse(poResponse, monoProductSpecificationSkuResponse, monoProductSpecificationPrdResponse, Mono.just(monoProductOfferingGroupResponse))
+                                        );
+                            } else {
+                                return fetchProductOfferingGroup(bearerToken, poResponse, productOfferingGroupSearchRequest, productOfferingGroupRequest,env)
+                                        .flatMap(monoProductOfferingGroupResponse ->
+                                                zipAndTransformResponse(poResponse, monoProductSpecificationSkuResponse, Mono.just(new ProductOfferingResponse()), Mono.just(monoProductOfferingGroupResponse))
+                                        );
+                            }
+                        });
+                    });
+        });
+    }
+
+    /**
+     * Fetches the Product Offering Group (POG) response
+     */
+    private Mono<ProductOfferingResponse> fetchProductOfferingGroup(
+            String bearerToken,
+            ProductOfferingResponse poResponse,
+            ProductOfferingGroupSearchRequest productOfferingGroupSearchRequest,
+            ProductOfferingRequest productOfferingGroupRequest,String env
+    ) {
+        String poDocumentId = poResponse.getDocuments().get(0).getDocumentMetaData().getDocumentID();
+        productOfferingGroupSearchRequest.getItem().getOr().get(0).getIds().get(0).setId(poDocumentId);
+        productOfferingGroupSearchRequest.getItem().getOr().get(1).getIds().get(0).setId(poDocumentId);
+
+        return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsSearchApi(env), productOfferingGroupSearchRequest, AmdocsSearchResponse.class)
+                .flatMap(searchResponse -> {
+                    String pogDocumentId = retrieveDocumentId(searchResponse);
+                    if (pogDocumentId.isEmpty()) {
+                        return Mono.just(new ProductOfferingResponse());  // Return empty response if no POG found
                     }
+
+                    productOfferingGroupRequest.getIds().get(0).setId(pogDocumentId);
+                    return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsProductApi(env), productOfferingGroupRequest, ProductOfferingResponse.class);
                 });
-            });
-    });
-}
+    }
 
-/**
- * Fetches the Product Offering Group (POG) response
- */
-private Mono<ProductOfferingResponse> fetchProductOfferingGroup(
-        String bearerToken,
-        ProductOfferingResponse poResponse,
-        ProductOfferingGroupSearchRequest productOfferingGroupSearchRequest,
-        ProductOfferingRequest productOfferingGroupRequest
-) {
-    String poDocumentId = poResponse.getDocuments().get(0).getDocumentMetaData().getDocumentID();
-    productOfferingGroupSearchRequest.getItem().getOr().get(0).getIds().get(0).setId(poDocumentId);
-    productOfferingGroupSearchRequest.getItem().getOr().get(1).getIds().get(0).setId(poDocumentId);
+    /**
+     * Extracts document ID for the Product Offering Group.
+     */
+    private String retrieveDocumentId(AmdocsSearchResponse amdocsSearchResponse) {
+        return amdocsSearchResponse.getDocuments().stream()
+                .filter(document -> document != null && "productOfferingGroup".equalsIgnoreCase(document.getEntityType()))
+                .map(document -> document.getDocumentMetaData().getDocumentID())
+                .findFirst()
+                .orElse(StringUtils.EMPTY);
+    }
 
-    return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsSearchApi(env), productOfferingGroupSearchRequest, AmdocsSearchResponse.class)
-            .flatMap(searchResponse -> {
-                String pogDocumentId = retrieveDocumentId(searchResponse);
-                if (pogDocumentId.isEmpty()) {
-                    return Mono.just(new ProductOfferingResponse());  // Return empty response if no POG found
-                }
-
-                productOfferingGroupRequest.getIds().get(0).setId(pogDocumentId);
-                return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsProductApi(env), productOfferingGroupRequest, ProductOfferingResponse.class);
-            });
-}
-
-/**
- * Extracts document ID for the Product Offering Group.
- */
-private String retrieveDocumentId(AmdocsSearchResponse amdocsSearchResponse) {
-    return amdocsSearchResponse.getDocuments().stream()
-            .filter(document -> document != null && "productOfferingGroup".equalsIgnoreCase(document.getEntityType()))
-            .map(document -> document.getDocumentMetaData().getDocumentID())
-            .findFirst()
-            .orElse(StringUtils.EMPTY);
-}
-
-/**
- * Zips and transforms the responses into `DeviceEpcDto`
- */
-private Mono<DeviceEpcDto> zipAndTransformResponse(
-        ProductOfferingResponse poResponse,
-        Mono<ProductOfferingResponse> monoProductSpecificationSkuResponse,
-        Mono<ProductOfferingResponse> monoProductSpecificationPrdResponse,
-        Mono<ProductOfferingResponse> monoProductOfferingGroupResponse
-) {
-    return Mono.zip(
-            Mono.just(poResponse),
-            monoProductSpecificationSkuResponse,
-            monoProductSpecificationPrdResponse,
-            monoProductOfferingGroupResponse
-    ).map(tuple -> {
-        HashMap<String, Object> responseMap = new HashMap<>();
-        responseMap.put(AmdocsConstants.PRODUCT_OFFER, tuple.getT1());
-        responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_SKU, tuple.getT2());
-        responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_PRD, tuple.getT3());
-        responseMap.put(AmdocsConstants.PRODUCT_OFFER_GROUP, tuple.getT4());
-        try {
-            return returnDeviceEpcDTO(responseMap);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
-    });
-}
-
+    /**
+     * Zips and transforms the responses into `DeviceEpcDto`
+     */
+    private Mono<DeviceEpcDto> zipAndTransformResponse(
+            ProductOfferingResponse poResponse,
+            Mono<ProductOfferingResponse> monoProductSpecificationSkuResponse,
+            Mono<ProductOfferingResponse> monoProductSpecificationPrdResponse,
+            Mono<ProductOfferingResponse> monoProductOfferingGroupResponse
+    ) {
+        return Mono.zip(
+                Mono.just(poResponse),
+                monoProductSpecificationSkuResponse,
+                monoProductSpecificationPrdResponse,
+                monoProductOfferingGroupResponse
+        ).map(tuple -> {
+            HashMap<String, Object> responseMap = new HashMap<>();
+            responseMap.put(AmdocsConstants.PRODUCT_OFFER, tuple.getT1());
+            responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_SKU, tuple.getT2());
+            responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_PRD, tuple.getT3());
+            responseMap.put(AmdocsConstants.PRODUCT_OFFER_GROUP, tuple.getT4());
+            try {
+                return returnDeviceEpcDTO(responseMap);
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
 
