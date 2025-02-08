@@ -1,0 +1,91 @@
+@ExtendWith(MockitoExtension.class)
+public class EPCDeviceServiceTest {
+
+    @InjectMocks
+    private EPCDeviceService epcDeviceService;
+
+    @Mock
+    private TokenService tokenService;
+
+    @Mock
+    private GenericWebClient genericWebClient;
+
+    @Mock
+    private EPCConfiguration epcConfiguration;
+
+    @Mock
+    private JsonToObjectConverter jsonToObjectConverter;
+
+    private final String env = "test-env";
+    private final String sorId = "12345";
+    private final String bearerToken = "Bearer mock-token";
+
+    @Test
+    public void testGetEPCDeviceDetails_Success() throws JsonProcessingException {
+        // Mock token service
+        Token mockToken = new Token();
+        mockToken.setToken("mock-token");
+        when(tokenService.getToken(env)).thenReturn(Mono.just(mockToken));
+
+        // Mock search API response
+        AmdocsSearchResponse mockSearchResponse = new AmdocsSearchResponse();
+        mockSearchResponse.setDocuments(List.of(createMockDocument("doc123")));
+        when(genericWebClient.callPostApi(eq(bearerToken), anyString(), any(), eq(AmdocsSearchResponse.class)))
+            .thenReturn(Mono.just(mockSearchResponse));
+
+        // Mock Product Offering Response
+        ProductOfferingResponse mockProductOfferingResponse = createMockProductOfferingResponse("prodSpec123");
+        when(genericWebClient.callPostApi(eq(bearerToken), anyString(), any(), eq(ProductOfferingResponse.class)))
+            .thenReturn(Mono.just(mockProductOfferingResponse));
+
+        // Verify final response
+        StepVerifier.create(epcDeviceService.getEPCDeviceDetails(sorId, env))
+                .expectNextMatches(dto -> dto != null)  // Ensure DTO is returned
+                .verifyComplete();
+    }
+
+    @Test
+    public void testGetEPCDeviceDetails_NoDocumentFound() throws JsonProcessingException {
+        Token mockToken = new Token();
+        mockToken.setToken("mock-token");
+        when(tokenService.getToken(env)).thenReturn(Mono.just(mockToken));
+
+        // Empty response from search API
+        AmdocsSearchResponse emptySearchResponse = new AmdocsSearchResponse();
+        emptySearchResponse.setDocuments(Collections.emptyList());
+        when(genericWebClient.callPostApi(anyString(), anyString(), any(), eq(AmdocsSearchResponse.class)))
+            .thenReturn(Mono.just(emptySearchResponse));
+
+        StepVerifier.create(epcDeviceService.getEPCDeviceDetails(sorId, env))
+                .expectErrorMatches(throwable -> throwable instanceof IndexOutOfBoundsException)  // Handle missing document scenario
+                .verify();
+    }
+
+    private AmdocsDocument createMockDocument(String documentId) {
+        AmdocsDocumentMetaData metaData = new AmdocsDocumentMetaData();
+        metaData.setDocumentID(documentId);
+
+        AmdocsDocument doc = new AmdocsDocument();
+        doc.setDocumentMetaData(metaData);
+        return doc;
+    }
+
+    private ProductOfferingResponse createMockProductOfferingResponse(String productSpecId) {
+        ProductSpecification productSpecification = new ProductSpecification();
+        productSpecification.setId(productSpecId);
+
+        AmdocsProductDocument productDocument = new AmdocsProductDocument();
+        productDocument.setProductSpecification(productSpecification);
+
+        AmdocsDocumentMetaData metaData = new AmdocsDocumentMetaData();
+        metaData.setDocumentID("prod123");
+
+        AmdocsProductDocumentWrapper docWrapper = new AmdocsProductDocumentWrapper();
+        docWrapper.setDocument(productDocument);
+        docWrapper.setDocumentMetaData(metaData);
+
+        ProductOfferingResponse response = new ProductOfferingResponse();
+        response.setDocuments(List.of(docWrapper));
+        return response;
+    }
+}
