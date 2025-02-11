@@ -1,0 +1,117 @@
+private AmdocsSearchResponse populateAmdocsSearchResponse() {
+        AmdocsSearchResponse response = new AmdocsSearchResponse();
+        response.setType("AmdocsResponse");
+
+        AmdocsSearchResponse.Document document1 = new AmdocsSearchResponse.Document();
+        AmdocsSearchResponse.Document document2 = new AmdocsSearchResponse.Document();
+
+        document1.setEntityType("ProductOffering");
+        document1.setDeleted(false);
+        document1.setDocumentMetaData(populateAmdocsDocumentMetaData("12345", "User1"));
+
+        document2.setEntityType("ServiceOffering");
+        document2.setDeleted(true);
+        document2.setDocumentMetaData(populateAmdocsDocumentMetaData("67890", "User2"));
+
+        response.setDocuments(Arrays.asList(document1, document2));
+        response.setCount(new AmdocsSearchResponse.Count());
+        response.getCount().setTotal(2);
+        response.getCount().setProductoffering(1);
+        response.setPaths(new Object());
+
+        return response;
+    }
+
+    private AmdocsSearchResponse.Document.DocumentMetaData populateAmdocsDocumentMetaData(String id, String user) {
+        AmdocsSearchResponse.Document.DocumentMetaData metaData = new AmdocsSearchResponse.Document.DocumentMetaData();
+        metaData.setDocumentID(id);
+        metaData.setLastModifiedDateTime(LocalDateTime.now());
+        metaData.setLastModifiedUser(user);
+        metaData.setPublishedStatus("Published");
+        metaData.setSharedStatus("Shared");
+        metaData.setBusinessEntityType("BusinessType");
+        metaData.setCode("CODE123");
+        metaData.setDocumentName(Arrays.asList("Name1", "Name2"));
+        return metaData;
+    }
+
+    private ProductOfferingResponse populateProductOfferingResponse() {
+        ProductOfferingResponse response = new ProductOfferingResponse();
+
+        ProductOfferingResponse.Document document1 = new ProductOfferingResponse.Document();
+        ProductOfferingResponse.Document document2 = new ProductOfferingResponse.Document();
+
+        document1.setEntityType("ProductOffering");
+        document1.setDeleted(false);
+        document1.setDocumentMetaData(populateProductOfferingDocumentMetaData("11111", "Admin1"));
+        document1.setDocument(populateDocumentContent());
+
+        document2.setEntityType("ServiceOffering");
+        document2.setDeleted(true);
+        document2.setDocumentMetaData(populateProductOfferingDocumentMetaData("22222", "Admin2"));
+        document2.setDocument(populateDocumentContent());
+
+        response.setDocuments(Arrays.asList(document1, document2));
+        response.setRelatedDocuments(Arrays.asList(new Object(), new Object()));
+        response.setRelations(Arrays.asList(Arrays.asList(new Object(), new Object()), Arrays.asList(new Object(), new Object())));
+        response.setPaths(new Object());
+        response.setCycles(new Object());
+
+        response.setCount(new ProductOfferingResponse.Count());
+        response.getCount().setTotal(2);
+        response.getCount().setProductoffering(1);
+
+        response.setRelatedCount(new ProductOfferingResponse.RelatedCount());
+        response.getRelatedCount().setTotal(2);
+
+        return response;
+    }
+
+    private ProductOfferingResponse.DocumentMetaData populateProductOfferingDocumentMetaData(String id, String user) {
+        ProductOfferingResponse.DocumentMetaData metaData = new ProductOfferingResponse.DocumentMetaData();
+        metaData.setDocumentID(id);
+        metaData.setLastModifiedDateTime("2024-02-05T12:00:00Z");
+        metaData.setLastModifiedUser(user);
+        metaData.setPublishedStatus("Active");
+        metaData.setDocumentName(Arrays.asList(populateLocalizedValue("en_US", "Document Name 1"), populateLocalizedValue("fr_FR", "Document Name 2")));
+        metaData.setCode("PROD123");
+        return metaData;
+    }
+
+    private ProductOfferingResponse.DocumentContent populateDocumentContent() {
+        ProductOfferingResponse.DocumentContent documentContent = new ProductOfferingResponse.DocumentContent();
+        documentContent.setBundle(true);
+        documentContent.setProductSpecification(new ProductOfferingResponse.ProductSpecification());
+        documentContent.getProductSpecification().setId("SPEC123");
+
+        documentContent.setBusinessName("Business Plan A");
+        documentContent.setDescription(Arrays.asList(populateLocalizedValue("en_US", "Desc 1"), populateLocalizedValue("es_ES", "Desc 2")));
+
+        ProductOfferingResponse.ProductOfferingCharacteristic characteristic = new ProductOfferingResponse.ProductOfferingCharacteristic();
+        characteristic.setAllowProductOfferingOverride(true);
+        characteristic.setConfigurable(true);
+        characteristic.setName("Characteristic 1");
+        characteristic.setValueType("String");
+        characteristic.setMaxCardinality(5);
+        characteristic.setMinCardinality(1);
+        characteristic.setExpiredForSales(false);
+        characteristic.setLocalizedName(Arrays.asList(populateLocalizedValue("en_US", "Char Name 1"), populateLocalizedValue("fr_FR", "Char Name 2")));
+
+        ProductOfferingResponse.ProductOfferingCharacteristicValue characteristicValue = new ProductOfferingResponse.ProductOfferingCharacteristicValue();
+        characteristicValue.setDefault(true);
+        characteristicValue.setExpiredForSales(false);
+        characteristicValue.setValue("Value1");
+        characteristicValue.setLocalizedValue(Arrays.asList(populateLocalizedValue("en_US", "Localized Value 1"), populateLocalizedValue("fr_FR", "Localized Value 2")));
+
+        characteristic.setProductOfferingCharacteristicValue(Arrays.asList(characteristicValue, characteristicValue));
+        documentContent.setProductOfferingCharacteristic(Arrays.asList(characteristic, characteristic));
+
+        return documentContent;
+    }
+
+    private ProductOfferingResponse.LocalizedValue populateLocalizedValue(String locale, String value) {
+        ProductOfferingResponse.LocalizedValue localizedValue = new ProductOfferingResponse.LocalizedValue();
+        localizedValue.setLocale(locale);
+        localizedValue.setValue(value);
+        return localizedValue;
+    }
