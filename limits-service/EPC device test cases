@@ -149,4 +149,88 @@ public class EPCServiceTest {
 
         verify(genericWebClient, times(1)).callPostApi(anyString(), anyString(), any(), eq(ProductOfferingResponse.class));
     }
+
+@Test
+    void testGetEPCDeviceDetails_Success() throws JsonProcessingException {
+        // Mock token service
+        when(tokenService.getToken("testEnv")).thenReturn(Mono.just(mockToken));
+
+        // Mock WebClient API call
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class)))
+                .thenReturn(Mono.just(mockResponse));
+
+        // Call the method
+        Mono<DeviceEpcDto> result = epcService.getEPCDeviceDetails("12345", "testEnv");
+
+        // Verify interactions
+        verify(tokenService, times(1)).getToken("testEnv");
+        assertNotNull(result.block()); // Ensures no null response
+    }
+
+    @Test
+    void testGetEpcMappedJson_Success() throws JsonProcessingException, XmlConversionException {
+        EPCService spyService = spy(epcService);
+        doReturn(Mono.just(deviceEpcDto)).when(spyService).getEPCDeviceDetails(any(), any());
+
+        Map<String, String> result = spyService.getEpcMappedJson("12345", "testEnv");
+
+        assertNotNull(result);
+    }
+
+    @Test
+    void testCreateSearchRequest_Success() throws JsonProcessingException {
+        ProductOfferSearchRequest request = epcService.createSearchRequest("12345");
+        assertNotNull(request);
+    }
+
+    @Test
+    void testFetchProductOffering_Success() {
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class)))
+                .thenReturn(Mono.just(mockResponse));
+
+        Mono<DeviceEpcDto> result = epcService.fetchProductOffering("mockToken", "testEnv", searchRequest);
+
+        assertNotNull(result.block());
+    }
+
+    @Test
+    void testRetrieveDocumentId_EmptyResponse() {
+        AmdocsSearchResponse response = new AmdocsSearchResponse();
+        response.setDocuments(Collections.emptyList());
+
+        String result = epcService.retrieveDocumentId(response);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testReturnGenericKeyMap_Success() {
+        HashMap<String, String> epcMap = new HashMap<>();
+        epcMap.put("key1", "value1");
+
+        HashMap<String, String> result = epcService.returnGenericKeyMap(epcMap);
+        assertNotNull(result);
+    }
+
+    @Test
+    void testReturnDeviceEpcDTO_Success() throws IllegalAccessException {
+        HashMap<String, Object> responseMap = new HashMap<>();
+        responseMap.put("key1", mockResponse);
+
+        DeviceEpcDto result = epcService.returnDeviceEpcDTO(responseMap);
+        assertNotNull(result);
+    }
+
+    @Test
+    void testConcatenateMapsIntoOne_Success() {
+        Map<String, String> map1 = new HashMap<>();
+        map1.put("key1", "value1");
+        Map<String, String> map2 = new HashMap<>();
+        map2.put("key2", "value2");
+
+        Map<String, String> result = epcService.concatenateMapsIntoOne(List.of(map1, map2));
+
+        assertEquals(2, result.size());
+        assertEquals("value1", result.get("key1"));
+        assertEquals("value2", result.get("key2"));
+    }
 }
