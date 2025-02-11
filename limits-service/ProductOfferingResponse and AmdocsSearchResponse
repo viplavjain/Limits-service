@@ -1,0 +1,323 @@
+package com.vzw.tools.authoring.entity;
+
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Getter
+@Setter
+public class AmdocsSearchResponse {
+    private String type;
+    private List<Document> documents;
+    private Count count;
+    private Object paths; // Can be null or a specific type based on actual data
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public List<Document> getDocuments() {
+        return documents;
+    }
+
+    public void setDocuments(List<Document> documents) {
+        this.documents = documents;
+    }
+
+    public Count getCount() {
+        return count;
+    }
+
+    public void setCount(Count count) {
+        this.count = count;
+    }
+
+    public Object getPaths() {
+        return paths;
+    }
+
+    public void setPaths(Object paths) {
+        this.paths = paths;
+    }
+
+    @Getter
+    @Setter
+    public static class Document {
+        private String entityType;
+        private DocumentMetaData documentMetaData;
+        private boolean deleted;
+
+        @Getter
+        @Setter
+        public static class DocumentMetaData {
+            private LocalDateTime lastModifiedDateTime;
+            private String lastModifiedUser;
+            private String documentID;
+            private Integer documentLevel;
+            private List<String> documentName;
+            private String sharedStatus;
+            private String publishedStatus;
+            private String productionStatus;
+            private String coreStatus;
+            private String businessEntityType;
+            private String originalEntityType;
+            private String customEntityType;
+            private String baseBusinessRequestID;
+            private String mergeBusinessRequestID;
+            private String rootID;
+            private String rootEntityType;
+            private String rootIndexType;
+            private String baseStatus;
+            private String code;
+        }
+    }
+
+    @Getter
+    @Setter
+    public static class Count {
+        private int total;
+        private int productoffering;
+    }
+
+    @Override
+    public String toString() {
+        return "AmdocsSearchResponse{" +
+                "type='" + type + '\'' +
+                ", documents=" + documents +
+                ", count=" + count +
+                ", paths=" + paths +
+                '}';
+    }
+}
+---------------------------------------------------------------------------------------------------------------
+@Getter
+@Setter
+public class ProductOfferingResponse {
+
+
+    public List<Document> documents;
+    public List<Object> relatedDocuments;
+    public List<List<Object>> relations;
+    public Object paths;
+    public Object cycles;
+    public Count count;
+    public RelatedCount relatedCount;
+
+    @Getter
+    @Setter
+    public static class Document {
+        public String entityType;
+        public DocumentMetaData documentMetaData;
+        public DocumentContent document;
+        public boolean deleted;
+    }
+
+    @Getter
+    @Setter
+    public static class BundledProductSpecification {
+        public String id;
+
+    }
+
+    @Getter
+    @Setter
+    public static class DocumentMetaData {
+        public String lastModifiedDateTime;
+        public String lastModifiedUser;
+        public String documentID;
+        public String documentLevel;
+        public List<LocalizedValue> documentName;
+        public Object sharedStatus;
+        public String publishedStatus;
+        public Object productionStatus;
+        public String coreStatus;
+        public String businessEntityType;
+        public String originalEntityType;
+        public Object customEntityType;
+        public Object baseBusinessRequestID;
+        public Object mergeBusinessRequestID;
+        public Object rootID;
+        public Object rootEntityType;
+        public Object rootIndexType;
+        public Object baseStatus;
+        public Object code;
+    }
+
+    @Getter
+    @Setter
+    public static class DocumentContent {
+        public boolean isBundle;
+        public ProductSpecification productSpecification;
+        public String businessName;
+        public List<LocalizedValue> description;
+        public List<ProductOfferingCharacteristic> productOfferingCharacteristic;
+        public List<ProductOfferingPrice> productOfferingPrice;
+        public ProductOfferingType productOfferingType;
+        public List<Object> bundledProductOffering;
+        public Currency currency;
+        public List<Object> productOfferingTerm;
+        public List<Object> policy;
+        public List<Object> prodSpecCharValueUse;
+        public List<Characteristic> characteristics;
+        public List<Object> bundledProdOfferGroupOption;
+        public Object durationPolicy;
+        public ValidFor validFor;
+        public Object valueRank;
+        public List<ProductOfferingQualification> productOfferingQualification;
+        public List<ExternalId> externalId;
+        public Object version;
+        public boolean mustBeBundled;
+        public List<Object> productOfferingCompositePrice;
+        public List<Object> restriction;
+        public Object name;
+        public List<Object> relatedPartyRef;
+        public boolean primary;
+        public List<BundledProductSpecification> bundledProductSpecification;
+    }
+
+    @Getter
+    @Setter
+    public static class LocalizedValue {
+        public String locale;
+        public String value;
+    }
+
+    @Getter
+    @Setter
+    public static class ProductSpecification {
+        public String id;
+    }
+
+    @Getter
+    @Setter
+    public static class ProductOfferingCharacteristic {
+        public boolean allowProductOfferingOverride;
+        public boolean configurable;
+        public boolean expiredForSales;
+        public List<LocalizedValue> localizedName;
+        public int maxCardinality;
+        public int minCardinality;
+        public String name;
+        public String valueType;
+        public boolean variantGroupCharacteristic;
+        public List<ProductOfferingCharacteristicValue> productOfferingCharacteristicValue;
+        public List<Object> freeTextDefault;
+    }
+
+    @Getter
+    @Setter
+    public static class ProductOfferingCharacteristicValue {
+        public boolean isDefault;
+        public boolean expiredForSales;
+        public List<LocalizedValue> localizedValue;
+        public String value;
+        public List<SourceElementRef> sourceElementRef;
+    }
+
+    @Getter
+    @Setter
+    public static class SourceElementRef {
+        public String id;
+        public String type;
+        public String jsonPath;
+    }
+
+    @Getter
+    @Setter
+    public static class ProductOfferingPrice {
+        public String id;
+        public Object isPublic;
+    }
+
+    @Getter
+    @Setter
+    public static class ProductOfferingType {
+        public String id;
+    }
+
+    @Getter
+    @Setter
+    public static class Currency {
+        public String defaultCurrency;
+        public List<String> currencies;
+    }
+
+    @Getter
+    @Setter
+    public static class ValidFor {
+        public String startDateTime;
+        public String endDateTime;
+    }
+
+    public static class ProductOfferingQualification {
+        public String id;
+    }
+
+    @Getter
+    @Setter
+    public static class ExternalId {
+        public String id;
+        public String owner;
+        public String type;
+        public String uid;
+    }
+
+    @Getter
+    @Setter
+    public static class Characteristic {
+        public String name;
+        public List<LocalizedValue> localizedName;
+        public String flatLocale_localizedName_en_US;
+        public String distinct_en_US;
+        public String type;
+        public List<Value> values;
+    }
+
+    @Getter
+    @Setter
+    public static class Value {
+        @JsonProperty("valueBoolean")
+        public Boolean valueBoolean;
+        @JsonProperty("valueFloat")
+        public Float valueFloat;
+        @JsonProperty("valueInteger")
+        public Integer valueInteger;
+        @JsonProperty("valueDate")
+        public String valueDate;
+        public String value;
+        public List<LocalizedValue> localizedValue;
+        public boolean isDefault;
+    }
+
+    @Getter
+    @Setter
+    public static class Count {
+        public int total;
+        public int productoffering;
+    }
+
+    @Getter
+    @Setter
+    public static class RelatedCount {
+        public int total;
+    }
+
+    @Override
+    public String toString() {
+        return "ProductOfferingResponse{" +
+                "documents=" + documents +
+                ", relatedDocuments=" + relatedDocuments +
+                ", relations=" + relations +
+                ", paths=" + paths +
+                ", cycles=" + cycles +
+                ", count=" + count +
+                ", relatedCount=" + relatedCount +
+                '}';
+    }
+}
