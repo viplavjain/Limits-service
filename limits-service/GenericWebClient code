@@ -1,0 +1,61 @@
+package com.vzw.tools.common.util;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+
+@Component
+public class GenericWebClient {
+    private final WebClient webClient;
+
+    @Autowired
+    public GenericWebClient(WebClient webClient) {
+        this.webClient = webClient;
+    }
+
+    public <T, R> Mono<R> callPostApi(String token, String apiPath, T requestBody,
+                                      Class<R> responseType) {
+        return webClient.post().uri(apiPath)
+                .header("Authorization", token)
+                .header("Content-Type", "application/json")
+                .bodyValue(requestBody == null ? Mono.empty() : requestBody)
+                .retrieve()
+                .bodyToMono(responseType);
+    }
+}
+--------------------------------------------------------------------------------------------
+org.mockito.exceptions.misusing.PotentialStubbingProblem: 
+Strict stubbing argument mismatch. Please check:
+ - this invocation of 'callPostApi' method:
+    genericWebClient.callPostApi(
+    "mockToken",
+    null,
+    com.vzw.tools.authoring.entity.ProductOfferSearchRequest@425d5d46,
+    class com.vzw.tools.authoring.entity.AmdocsSearchResponse
+);
+    -> at com.vzw.tools.authoring.service.EPCService.fetchProductOffering(EPCService.java:92)
+ - has following stubbing(s) with different arguments:
+    1. genericWebClient.callPostApi(
+    null,
+    null,
+    null,
+    null
+);
+      -> at com.vzw.tools.authoring.service.EPCServiceTest.testFetchProductOffering_Success(EPCServiceTest.java:95)
+Typically, stubbing argument mismatch indicates user mistake when writing tests.
+Mockito fails early so that you can debug potential problem easily.
+However, there are legit scenarios when this exception generates false negative signal:
+  - stubbing the same method multiple times using 'given().will()' or 'when().then()' API
+    Please use 'will().given()' or 'doReturn().when()' API for stubbing.
+  - stubbed method is intentionally invoked with different arguments by code under test
+    Please use default or 'silent' JUnit Rule (equivalent of Strictness.LENIENT).
+For more information see javadoc for PotentialStubbingProblem class.
+
+	at com.vzw.tools.common.util.GenericWebClient.callPostApi(GenericWebClient.java:19)
+	at com.vzw.tools.authoring.service.EPCService.fetchProductOffering(EPCService.java:92)
+	at com.vzw.tools.authoring.service.EPCServiceTest.testFetchProductOffering_Success(EPCServiceTest.java:98)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
