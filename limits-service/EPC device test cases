@@ -1,8 +1,30 @@
-@ExtendWith(MockitoExtension.class)
-public class EPCDeviceServiceTest {
+package com.vzw.tools.authoring.service;
 
-    @InjectMocks
-    private EPCDeviceService epcDeviceService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.vzw.tools.authoring.configuration.EpcConfiguration;
+import com.vzw.tools.authoring.dto.DeviceEpcDto;
+import com.vzw.tools.authoring.entity.*;
+import com.vzw.tools.common.exception.XmlConversionException;
+import com.vzw.tools.common.service.TokenService;
+import com.vzw.tools.common.util.GenericWebClient;
+import com.vzw.tools.source.configuration.RunTimeMapInitializer;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Mono;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class EPCServiceTest {
 
     @Mock
     private TokenService tokenService;
@@ -11,81 +33,110 @@ public class EPCDeviceServiceTest {
     private GenericWebClient genericWebClient;
 
     @Mock
-    private EPCConfiguration epcConfiguration;
+    private RunTimeMapInitializer runTimeMapInitializer;
 
     @Mock
-    private JsonToObjectConverter jsonToObjectConverter;
+    private EpcConfiguration epcConfiguration;
 
-    private final String env = "test-env";
-    private final String sorId = "12345";
-    private final String bearerToken = "Bearer mock-token";
+    @InjectMocks
+    private EPCService epcService;
+
+    private DeviceEpcDto deviceEpcDto;
+    private Token mockToken;
+    private ProductOfferSearchRequest searchRequest;
+    private ProductOfferingResponse mockResponse;
+
+    @BeforeEach
+    void setUp() {
+        deviceEpcDto = new DeviceEpcDto();
+        mockToken = new Token();
+        mockToken.setToken("mockToken");
+
+        searchRequest = new ProductOfferSearchRequest();
+        mockResponse = new ProductOfferingResponse();
+    }
 
     @Test
-    public void testGetEPCDeviceDetails_Success() throws JsonProcessingException {
+    void testGetEPCDeviceDetails_Success() throws JsonProcessingException {
         // Mock token service
-        Token mockToken = new Token();
-        mockToken.setToken("mock-token");
-        when(tokenService.getToken(env)).thenReturn(Mono.just(mockToken));
+        when(tokenService.getToken("testEnv")).thenReturn(Mono.just(mockToken));
 
-        // Mock search API response
-        AmdocsSearchResponse mockSearchResponse = new AmdocsSearchResponse();
-        mockSearchResponse.setDocuments(List.of(createMockDocument("doc123")));
-        when(genericWebClient.callPostApi(eq(bearerToken), anyString(), any(), eq(AmdocsSearchResponse.class)))
-            .thenReturn(Mono.just(mockSearchResponse));
+        // Mock WebClient API call
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class)))
+                .thenReturn(Mono.just(mockResponse));
 
-        // Mock Product Offering Response
-        ProductOfferingResponse mockProductOfferingResponse = createMockProductOfferingResponse("prodSpec123");
-        when(genericWebClient.callPostApi(eq(bearerToken), anyString(), any(), eq(ProductOfferingResponse.class)))
-            .thenReturn(Mono.just(mockProductOfferingResponse));
+        // Call the method
+        Mono<DeviceEpcDto> result = epcService.getEPCDeviceDetails("12345", "testEnv");
 
-        // Verify final response
-        StepVerifier.create(epcDeviceService.getEPCDeviceDetails(sorId, env))
-                .expectNextMatches(dto -> dto != null)  // Ensure DTO is returned
-                .verifyComplete();
+        // Verify interactions
+        verify(tokenService, times(1)).getToken("testEnv");
+        assertNotNull(result.block()); // Ensures no null response
     }
 
     @Test
-    public void testGetEPCDeviceDetails_NoDocumentFound() throws JsonProcessingException {
-        Token mockToken = new Token();
-        mockToken.setToken("mock-token");
-        when(tokenService.getToken(env)).thenReturn(Mono.just(mockToken));
+    void testGetEpcMappedJson_Success() throws JsonProcessingException, XmlConversionException {
+        EPCService spyService = spy(epcService);
+        doReturn(Mono.just(deviceEpcDto)).when(spyService).getEPCDeviceDetails(any(), any());
 
-        // Empty response from search API
-        AmdocsSearchResponse emptySearchResponse = new AmdocsSearchResponse();
-        emptySearchResponse.setDocuments(Collections.emptyList());
-        when(genericWebClient.callPostApi(anyString(), anyString(), any(), eq(AmdocsSearchResponse.class)))
-            .thenReturn(Mono.just(emptySearchResponse));
+        Map<String, String> result = spyService.getEpcMappedJson("12345", "testEnv");
 
-        StepVerifier.create(epcDeviceService.getEPCDeviceDetails(sorId, env))
-                .expectErrorMatches(throwable -> throwable instanceof IndexOutOfBoundsException)  // Handle missing document scenario
-                .verify();
+        assertNotNull(result);
     }
 
-    private AmdocsDocument createMockDocument(String documentId) {
-        AmdocsDocumentMetaData metaData = new AmdocsDocumentMetaData();
-        metaData.setDocumentID(documentId);
-
-        AmdocsDocument doc = new AmdocsDocument();
-        doc.setDocumentMetaData(metaData);
-        return doc;
+    @Test
+    void testCreateSearchRequest_Success() throws JsonProcessingException {
+        ProductOfferSearchRequest request = epcService.createSearchRequest("12345");
+        assertNotNull(request);
     }
 
-    private ProductOfferingResponse createMockProductOfferingResponse(String productSpecId) {
-        ProductSpecification productSpecification = new ProductSpecification();
-        productSpecification.setId(productSpecId);
+    @Test
+    void testFetchProductOffering_Success() {
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class)))
+                .thenReturn(Mono.just(mockResponse));
 
-        AmdocsProductDocument productDocument = new AmdocsProductDocument();
-        productDocument.setProductSpecification(productSpecification);
+        Mono<DeviceEpcDto> result = epcService.fetchProductOffering("mockToken", "testEnv", searchRequest);
 
-        AmdocsDocumentMetaData metaData = new AmdocsDocumentMetaData();
-        metaData.setDocumentID("prod123");
+        assertNotNull(result.block());
+    }
 
-        AmdocsProductDocumentWrapper docWrapper = new AmdocsProductDocumentWrapper();
-        docWrapper.setDocument(productDocument);
-        docWrapper.setDocumentMetaData(metaData);
+    @Test
+    void testRetrieveDocumentId_EmptyResponse() {
+        AmdocsSearchResponse response = new AmdocsSearchResponse();
+        response.setDocuments(Collections.emptyList());
 
-        ProductOfferingResponse response = new ProductOfferingResponse();
-        response.setDocuments(List.of(docWrapper));
-        return response;
+        String result = epcService.retrieveDocumentId(response);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testReturnGenericKeyMap_Success() {
+        HashMap<String, String> epcMap = new HashMap<>();
+        epcMap.put("key1", "value1");
+
+        HashMap<String, String> result = epcService.returnGenericKeyMap(epcMap);
+        assertNotNull(result);
+    }
+
+    @Test
+    void testReturnDeviceEpcDTO_Success() throws IllegalAccessException {
+        HashMap<String, Object> responseMap = new HashMap<>();
+        responseMap.put("key1", mockResponse);
+
+        DeviceEpcDto result = epcService.returnDeviceEpcDTO(responseMap);
+        assertNotNull(result);
+    }
+
+    @Test
+    void testConcatenateMapsIntoOne_Success() {
+        Map<String, String> map1 = new HashMap<>();
+        map1.put("key1", "value1");
+        Map<String, String> map2 = new HashMap<>();
+        map2.put("key2", "value2");
+
+        Map<String, String> result = epcService.concatenateMapsIntoOne(List.of(map1, map2));
+
+        assertEquals(2, result.size());
+        assertEquals("value1", result.get("key1"));
+        assertEquals("value2", result.get("key2"));
     }
 }
