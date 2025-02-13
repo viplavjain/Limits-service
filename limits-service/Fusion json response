@@ -1216,3 +1216,190 @@
         ]
     }
 }
+--------------------------------------------------------------------------------------
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+import java.util.Map;
+
+public class ApiResponse {
+    @JsonProperty("responseHeader")
+    private ResponseHeader responseHeader;
+
+    @JsonProperty("response")
+    private Response response;
+
+    public static class ResponseHeader {
+        @JsonProperty("zkConnected")
+        private boolean zkConnected;
+
+        @JsonProperty("status")
+        private int status;
+
+        @JsonProperty("QTime")
+        private int qTime;
+
+        @JsonProperty("params")
+        private Map<String, String> params;
+    }
+
+    public static class Response {
+        @JsonProperty("numFound")
+        private int numFound;
+
+        @JsonProperty("start")
+        private int start;
+
+        @JsonProperty("docs")
+        private List<Doc> docs;
+    }
+
+    public static class Doc {
+        @JsonProperty("sku_image_set_digital_url_s")
+        private String skuImageSetDigitalUrl;
+
+        @JsonProperty("product_e911Address_flag_b")
+        private boolean productE911AddressFlag;
+
+        @JsonProperty("sku.image_set_non_digital_url")
+        private List<String> skuImageSetNonDigitalUrl;
+
+        @JsonProperty("rollup_id_s")
+        private String rollupId;
+
+        @JsonProperty("brand_seo_url_name")
+        private String brandSeoUrlName;
+
+        @JsonProperty("product_Numbershare_flag_b")
+        private boolean productNumbershareFlag;
+
+        @JsonProperty("product_isvalidproduct_b")
+        private boolean productIsValidProduct;
+
+        @JsonProperty("sku.sor_product_family")
+        private List<String> skuSorProductFamily;
+
+        @JsonProperty("sku_sor_product_family_s")
+        private String skuSorProductFamilyS;
+
+        @JsonProperty("product_min_fullRetailPrice_f")
+        private double productMinFullRetailPrice;
+
+        @JsonProperty("sku_sor_product_family_t")
+        private List<String> skuSorProductFamilyT;
+
+        @JsonProperty("sku.sim_sku")
+        private List<String> skuSimSku;
+
+        @JsonProperty("launchDateScore")
+        private double launchDateScore;
+
+        @JsonProperty("sku_default_display_flag_b")
+        private boolean skuDefaultDisplayFlag;
+
+        @JsonProperty("brand")
+        private String brand;
+
+        @JsonProperty("product_seo_url_name_s")
+        private String productSeoUrlName;
+
+        @JsonProperty("product_sor_device_type_s")
+        private String productSorDeviceType;
+
+        @JsonProperty("sku_showcase_flag_b")
+        private boolean skuShowcaseFlag;
+
+        @JsonProperty("product_description_ss")
+        private List<String> productDescription;
+
+        @JsonProperty("product_features_phone_cap_display_name_ss")
+        private List<String> productFeatures;
+
+        @JsonProperty("sku_id_s")
+        private String skuId;
+
+        @JsonProperty("sku_marketing_color_s")
+        private String skuMarketingColor;
+
+        @JsonProperty("sku.memory")
+        private List<String> skuMemory;
+
+        @JsonProperty("product_display_name_s")
+        private String productDisplayName;
+
+        @JsonProperty("sku_image_name_s")
+        private String skuImageName;
+
+        @JsonProperty("product_display_name_t")
+        private List<String> productDisplayNameT;
+
+        @JsonProperty("sku_capacity_unit_s")
+        private String skuCapacityUnit;
+
+        @JsonProperty("product_operating_system_s")
+        private String productOperatingSystem;
+
+        @JsonProperty("sku_sim_sku_s")
+        private String skuSimSkuS;
+
+        @JsonProperty("product_showcase_flag_b")
+        private boolean productShowcaseFlag;
+
+        @JsonProperty("defaultImage_s")
+        private String defaultImage;
+
+        @JsonProperty("device_compatible_name")
+        private List<String> deviceCompatibleName;
+
+        @JsonProperty("sku.image_set")
+        private List<String> skuImageSet;
+
+        @JsonProperty("sku_filter_display_name_ss")
+        private List<String> skuFilterDisplayName;
+
+        @JsonProperty("product_sor_device_family_type_s")
+        private String productSorDeviceFamilyType;
+
+        @JsonProperty("sku_color_style_s")
+        private String skuColorStyle;
+
+        @JsonProperty("color")
+        private String color;
+
+        @JsonProperty("color_seo_url_name")
+        private String colorSeoUrlName;
+
+        @JsonProperty("revenueSaleScore")
+        private double revenueSaleScore;
+
+        @JsonProperty("sku_type_s")
+        private String skuType;
+
+        @JsonProperty("sku_memory_s")
+        private String skuMemoryS;
+
+        @JsonProperty("sku_site_id_s")
+        private String skuSiteId;
+
+        @JsonProperty("quantity_i")
+        private int quantity;
+
+        @JsonProperty("isInStock_b")
+        private boolean isInStock;
+
+        @JsonProperty("isAvailable_b")
+        private boolean isAvailable;
+
+        @JsonProperty("inventoryStatus_s")
+        private String inventoryStatus;
+
+        @JsonProperty("critical_inventory_b")
+        private boolean criticalInventory;
+
+        @JsonProperty("fullRetailPrice_f")
+        private double fullRetailPrice;
+
+        @JsonProperty("preffered_Term_i")
+        private int preferredTerm;
+    }
+}
+
