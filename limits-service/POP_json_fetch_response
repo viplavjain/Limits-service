@@ -418,3 +418,88 @@
     "isRecordDuplicate": null,
     "isInvalidRecord": false
 }
+------------------------------------------------------------------------
+import lombok.Data;
+import java.util.List;
+
+@Data
+public class PriceResponse {
+    private List<PriceRecord> priceRecords;
+    private Links _links;
+    private int totalCharges;
+    private int nonFilteredTotalCharges;
+    private boolean hasPriority;
+    private Boolean isRecordDuplicate;
+    private boolean isInvalidRecord;
+
+    @Data
+    public static class PriceRecord {
+        private String priceRecordId;
+        private int priority;
+        private List<Price> price;
+        private List<Parameter> parameter;
+        private List<Object> externalIds;
+        private boolean hasDefaultInstallment;
+    }
+
+    @Data
+    public static class Price {
+        private String id;
+        private Object taxIncludedAmount;
+        private DutyFreeAmount dutyFreeAmount;
+        private Object priceReduction;
+        private Object percentage;
+        private Object priceAttribute;
+        private ValidFor validFor;
+        private Object pricedNumberOfUnits;
+    }
+
+    @Data
+    public static class DutyFreeAmount {
+        private double value;
+        private String unit;
+        private Object symbol;
+    }
+
+    @Data
+    public static class ValidFor {
+        private String startDateTime;
+        private Object endDateTime;
+    }
+
+    @Data
+    public static class Parameter {
+        private String name;
+        private ParameterValue value;
+        private Object unitOfMeasure;
+        private Object valueTo;
+        private Object valueFrom;
+        private Object valueList;
+    }
+
+    @Data
+    public static class ParameterValue {
+        private String name;
+        private List<LocalizedName> localizedName;
+        private Object valueTo;
+        private Object valueFrom;
+    }
+
+    @Data
+    public static class LocalizedName {
+        private String locale;
+        private String value;
+    }
+
+    @Data
+    public static class Links {
+        private Self self;
+    }
+
+    @Data
+    public static class Self {
+        private String href;
+        private Object method;
+    }
+}
+
