@@ -1,0 +1,420 @@
+{
+    "priceRecords": [
+        {
+            "priceRecordId": "0",
+            "priority": 0,
+            "price": [
+                {
+                    "id": "0",
+                    "taxIncludedAmount": null,
+                    "dutyFreeAmount": {
+                        "value": 1499.99000000000,
+                        "unit": "USD",
+                        "symbol": null
+                    },
+                    "priceReduction": null,
+                    "percentage": null,
+                    "priceAttribute": null,
+                    "validFor": {
+                        "startDateTime": "1900-01-01T00:00:00Z",
+                        "endDateTime": null
+                    },
+                    "pricedNumberOfUnits": null
+                }
+            ],
+            "parameter": [
+                {
+                    "name": "vz_location",
+                    "value": {
+                        "name": "1000001",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "1000001"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                },
+                {
+                    "name": "Commitment",
+                    "value": {
+                        "name": "0",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "0 Month"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                },
+                {
+                    "name": "vz_price_type",
+                    "value": {
+                        "name": "FRP",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "Full Retail Price"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                }
+            ],
+            "externalIds": [],
+            "hasDefaultInstallment": true
+        },
+        {
+            "priceRecordId": "1",
+            "priority": 0,
+            "price": [
+                {
+                    "id": "1",
+                    "taxIncludedAmount": null,
+                    "dutyFreeAmount": {
+                        "value": 1499.99000000000,
+                        "unit": "USD",
+                        "symbol": null
+                    },
+                    "priceReduction": null,
+                    "percentage": null,
+                    "priceAttribute": null,
+                    "validFor": {
+                        "startDateTime": "1900-01-01T00:00:00Z",
+                        "endDateTime": null
+                    },
+                    "pricedNumberOfUnits": null
+                }
+            ],
+            "parameter": [
+                {
+                    "name": "vz_location",
+                    "value": {
+                        "name": "1000001",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "1000001"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                },
+                {
+                    "name": "Commitment",
+                    "value": {
+                        "name": "12",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "12 Month"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                },
+                {
+                    "name": "vz_price_type",
+                    "value": {
+                        "name": "CP",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "Contract Price"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                }
+            ],
+            "externalIds": [],
+            "hasDefaultInstallment": true
+        },
+        {
+            "priceRecordId": "2",
+            "priority": 0,
+            "price": [
+                {
+                    "id": "2",
+                    "taxIncludedAmount": null,
+                    "dutyFreeAmount": {
+                        "value": 1049.99000000000,
+                        "unit": "USD",
+                        "symbol": null
+                    },
+                    "priceReduction": null,
+                    "percentage": null,
+                    "priceAttribute": null,
+                    "validFor": {
+                        "startDateTime": "1900-01-01T00:00:00Z",
+                        "endDateTime": null
+                    },
+                    "pricedNumberOfUnits": null
+                }
+            ],
+            "parameter": [
+                {
+                    "name": "vz_location",
+                    "value": {
+                        "name": "1000001",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "1000001"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                },
+                {
+                    "name": "Commitment",
+                    "value": {
+                        "name": "24",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "24 Month"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                },
+                {
+                    "name": "vz_price_type",
+                    "value": {
+                        "name": "CP",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "Contract Price"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                }
+            ],
+            "externalIds": [],
+            "hasDefaultInstallment": true
+        },
+        {
+            "priceRecordId": "3",
+            "priority": 0,
+            "price": [
+                {
+                    "id": "3",
+                    "taxIncludedAmount": null,
+                    "dutyFreeAmount": {
+                        "value": 1499.99000000000,
+                        "unit": "USD",
+                        "symbol": null
+                    },
+                    "priceReduction": null,
+                    "percentage": null,
+                    "priceAttribute": null,
+                    "validFor": {
+                        "startDateTime": "1900-01-01T00:00:00Z",
+                        "endDateTime": null
+                    },
+                    "pricedNumberOfUnits": null
+                }
+            ],
+            "parameter": [
+                {
+                    "name": "vz_location",
+                    "value": {
+                        "name": "1000001",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "1000001"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                },
+                {
+                    "name": "Commitment",
+                    "value": {
+                        "name": "0",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "0 Month"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                },
+                {
+                    "name": "vz_price_type",
+                    "value": {
+                        "name": "PP",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "Prepaid Price"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                }
+            ],
+            "externalIds": [],
+            "hasDefaultInstallment": true
+        },
+        {
+            "priceRecordId": "4",
+            "priority": 0,
+            "price": [
+                {
+                    "id": "4",
+                    "taxIncludedAmount": null,
+                    "dutyFreeAmount": {
+                        "value": 1499.99000000000,
+                        "unit": "USD",
+                        "symbol": null
+                    },
+                    "priceReduction": null,
+                    "percentage": null,
+                    "priceAttribute": null,
+                    "validFor": {
+                        "startDateTime": "1900-01-01T00:00:00Z",
+                        "endDateTime": null
+                    },
+                    "pricedNumberOfUnits": null
+                }
+            ],
+            "parameter": [
+                {
+                    "name": "vz_location",
+                    "value": {
+                        "name": "1000001",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "1000001"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                },
+                {
+                    "name": "Commitment",
+                    "value": {
+                        "name": "0",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "0 Month"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                },
+                {
+                    "name": "vz_price_type",
+                    "value": {
+                        "name": "EFRP",
+                        "localizedName": [
+                            {
+                                "locale": "en-US",
+                                "value": "Full Edge Price"
+                            }
+                        ],
+                        "valueTo": null,
+                        "valueFrom": null
+                    },
+                    "unitOfMeasure": null,
+                    "valueTo": null,
+                    "valueFrom": null,
+                    "valueList": null
+                }
+            ],
+            "externalIds": [],
+            "hasDefaultInstallment": true
+        }
+    ],
+    "_links": {
+        "self": {
+            "href": "https://catalogone-apigw-qa1b-at-npge.ebiz.verizon.com/catalogManagement/pricing/v2/price/19544237-4f5a-4ca4-8b27-75c0bdda0995/viewPriceRecord?offset=1&limit=2147483647",
+            "method": null
+        }
+    },
+    "totalCharges": 5,
+    "nonFilteredTotalCharges": 5,
+    "hasPriority": false,
+    "isRecordDuplicate": null,
+    "isInvalidRecord": false
+}
