@@ -27,3 +27,59 @@ public class AuthController {
         return (Mono<T>) epcService.getEPCDeviceDetails(sorId, env);
     }
 }
+-----------------------------------------------------------------------------------------
+package com.vzw.tools.authoring.controller;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.vzw.tools.authoring.service.EPCService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Mono;
+
+import static org.mockito.Mockito.*;
+
+class AuthControllerTest {
+
+    @Mock
+    private EPCService epcService;
+
+    @InjectMocks
+    private AuthController authController;
+
+    private WebTestClient webTestClient;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+        webTestClient = WebTestClient.bindToController(authController).build();
+    }
+
+    @Test
+    void testGetEPC() throws JsonProcessingException {
+        // Mock response
+        String sorId = "12345";
+        String env = "test";
+        String productType = "device";
+        String mockResponse = "{ \"message\": \"Success\", \"data\": {} }";
+
+        when(epcService.getEPCDeviceDetails(sorId, env)).thenReturn(Mono.just(mockResponse));
+
+        // Perform GET request
+        webTestClient.get()
+                .uri("/federatedCatalog-internal/epc/{productType}/{env}?sorId={sorId}", productType, env, sorId)
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .isEqualTo(mockResponse);
+
+        // Verify service call
+        verify(epcService, times(1)).getEPCDeviceDetails(sorId, env);
+    }
+}
+
