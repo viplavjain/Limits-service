@@ -1,0 +1,29 @@
+package com.vzw.tools.authoring.controller;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.vzw.tools.authoring.service.EPCService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
+
+
+@RestController
+@RequestMapping("/federatedCatalog-internal")
+@Slf4j
+public class AuthController {
+
+    private final EPCService epcService;
+
+    @Autowired
+    public AuthController(EPCService epcService) {
+        this.epcService = epcService;
+    }
+
+    @GetMapping("/epc/{productType}/{env}")
+    public <T> Mono<T> getEPC(@PathVariable String productType,
+                              @PathVariable String env,
+                              @RequestParam(value = "sorId", required = true) String sorId) throws JsonProcessingException {
+        return (Mono<T>) epcService.getEPCDeviceDetails(sorId, env);
+    }
+}
