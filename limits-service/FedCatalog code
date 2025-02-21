@@ -1,0 +1,27 @@
+public HashMap<String,String> fedCatalogDeviceDetails(String sys, String acc_sku, String type) throws XmlConversionException {
+
+        SimpleJdbcCall simpleJdbcCall = new SimpleJdbcCall(fedCatalogConfiguration.jdbcTemplateForEnv("QA1"))
+                .withSchemaName("EPCREP")
+                .withProcedureName(FEDCATALOG_SP_DEVICE)
+                .returningResultSet(DEVICE_INFO, new BeanPropertyRowMapper<>(HashMap.class));
+        SqlParameterSource inParams = new MapSqlParameterSource()
+                .addValue("p_sor_id", "CLNRSMR765");
+
+        Map<String,Object> result = simpleJdbcCall.execute(inParams);
+
+       ArrayList<LinkedCaseInsensitiveMap<String>> al=  (ArrayList<LinkedCaseInsensitiveMap<String>>)result.get("P_RESULT_SET");
+       HashMap<String,String> fedCatalogMap = new HashMap<>();
+       if(al != null){
+           LinkedCaseInsensitiveMap caseInsensitiveMap = al.get(0);
+           fedCatalogMap = new HashMap<>(caseInsensitiveMap);
+           return (fedCatalogMap);
+       }
+       else {
+           return (fedCatalogMap);
+       }
+    }
+-------------------------------------------------------------------------------------------------------------------
+{
+    "details": "JSON encoding error: class java.math.BigDecimal cannot be cast to class java.lang.String (java.math.BigDecimal and java.lang.String are in module java.base of loader 'bootstrap')",
+    "error": "Internal server error"
+}
