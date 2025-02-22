@@ -92,6 +92,16 @@ public class EPCServiceTest {
        verify(tokenService, times(1)).getToken("qa1");
        assertNotNull(result.block()); // Ensures no null response
    }
+/*org.mockito.exceptions.misusing.UnnecessaryStubbingException: 
+Unnecessary stubbings detected.
+Clean & maintainable test code requires zero unnecessary code.
+Following stubbings are unnecessary (click to navigate to relevant line of code):
+  1. -> at com.vzw.tools.authoring.service.EPCServiceTest.testGetEPCDeviceDetails_Success(EPCServiceTest.java:85)
+Please remove unnecessary stubbings or use 'lenient' strictness. More info: javadoc for UnnecessaryStubbingException class.
+
+	at org.mockito.junit.jupiter.MockitoExtension.afterEach(MockitoExtension.java:197)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)*/
 
     @Test
     void testGetEpcMappedJson_Success() throws JsonProcessingException, XmlConversionException {
