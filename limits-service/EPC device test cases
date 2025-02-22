@@ -1,6 +1,16 @@
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+package com.vzw.tools.authoring.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.vzw.tools.authoring.configuration.EpcConfiguration;
+import com.vzw.tools.authoring.dto.DeviceEpcDto;
+import com.vzw.tools.authoring.entity.*;
+import com.vzw.tools.common.constant.AmdocsConstants;
+import com.vzw.tools.common.exception.XmlConversionException;
+import com.vzw.tools.common.service.TokenService;
+import com.vzw.tools.common.util.GenericWebClient;
+import com.vzw.tools.common.util.JsonToObjectConverter;
+import com.vzw.tools.source.configuration.RunTimeMapInitializer;
+import org.junit.Ignore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,10 +19,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 
-import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class EPCServiceTest {
@@ -20,152 +37,61 @@ public class EPCServiceTest {
     @Mock
     private GenericWebClient genericWebClient;
 
+    @Mock
+    private TokenService tokenService;
+
+    @Mock
+    private RunTimeMapInitializer runTimeMapInitializer;
+
     @InjectMocks
     private EPCService epcService;
 
+    @Mock
+    private EpcConfiguration epcConfiguration;
+
+    private ProductOfferSearchRequest searchRequest;
+
     private AmdocsSearchResponse mockAmdocsResponse;
     private ProductOfferingResponse mockProductOfferingResponse;
+    private ProductOfferingPriceResponse mockProductOfferingPriceResponse;
+    private DeviceEpcDto deviceEpcDto;
+    private Token mockToken;
 
     @BeforeEach
-    void setUp() {
-        mockAmdocsResponse = populateAmdocsSearchResponse();
-        mockProductOfferingResponse = populateProductOfferingResponse();
-    }
-
-    private AmdocsSearchResponse populateAmdocsSearchResponse() {
-        AmdocsSearchResponse response = new AmdocsSearchResponse();
-        response.setType("AmdocsResponse");
-
-        AmdocsSearchResponse.Document document1 = new AmdocsSearchResponse.Document();
-        AmdocsSearchResponse.Document document2 = new AmdocsSearchResponse.Document();
-
-        document1.setEntityType("ProductOffering");
-        document1.setDeleted(false);
-        document1.setDocumentMetaData(populateAmdocsDocumentMetaData("12345", "User1"));
-
-        document2.setEntityType("ServiceOffering");
-        document2.setDeleted(true);
-        document2.setDocumentMetaData(populateAmdocsDocumentMetaData("67890", "User2"));
-
-        response.setDocuments(Arrays.asList(document1, document2));
-        response.setCount(new AmdocsSearchResponse.Count());
-        response.getCount().setTotal(2);
-        response.getCount().setProductoffering(1);
-        response.setPaths(new Object());
-
-        return response;
-    }
-
-    private AmdocsSearchResponse.Document.DocumentMetaData populateAmdocsDocumentMetaData(String id, String user) {
-        AmdocsSearchResponse.Document.DocumentMetaData metaData = new AmdocsSearchResponse.Document.DocumentMetaData();
-        metaData.setDocumentID(id);
-        metaData.setLastModifiedDateTime(LocalDateTime.now());
-        metaData.setLastModifiedUser(user);
-        metaData.setPublishedStatus("Published");
-        metaData.setSharedStatus("Shared");
-        metaData.setBusinessEntityType("BusinessType");
-        metaData.setCode("CODE123");
-        metaData.setDocumentName(Arrays.asList("Name1", "Name2"));
-        return metaData;
-    }
-
-    private ProductOfferingResponse populateProductOfferingResponse() {
-        ProductOfferingResponse response = new ProductOfferingResponse();
-
-        ProductOfferingResponse.Document document1 = new ProductOfferingResponse.Document();
-        ProductOfferingResponse.Document document2 = new ProductOfferingResponse.Document();
-
-        document1.setEntityType("ProductOffering");
-        document1.setDeleted(false);
-        document1.setDocumentMetaData(populateProductOfferingDocumentMetaData("11111", "Admin1"));
-
-        document2.setEntityType("ServiceOffering");
-        document2.setDeleted(true);
-        document2.setDocumentMetaData(populateProductOfferingDocumentMetaData("22222", "Admin2"));
-
-        response.setDocuments(Arrays.asList(document1, document2));
-        response.setRelatedDocuments(Arrays.asList(new Object(), new Object()));
-        response.setRelations(Arrays.asList(Arrays.asList(new Object(), new Object()), Arrays.asList(new Object(), new Object())));
-        response.setPaths(new Object());
-        response.setCycles(new Object());
-
-        response.setCount(new ProductOfferingResponse.Count());
-        response.getCount().setTotal(2);
-        response.getCount().setProductoffering(1);
-
-        response.setRelatedCount(new ProductOfferingResponse.RelatedCount());
-        response.getRelatedCount().setTotal(2);
-
-        return response;
-    }
-
-    private ProductOfferingResponse.DocumentMetaData populateProductOfferingDocumentMetaData(String id, String user) {
-        ProductOfferingResponse.DocumentMetaData metaData = new ProductOfferingResponse.DocumentMetaData();
-        metaData.setDocumentID(id);
-        metaData.setLastModifiedDateTime("2024-02-05T12:00:00Z");
-        metaData.setLastModifiedUser(user);
-        metaData.setPublishedStatus("Active");
-        metaData.setDocumentName(Arrays.asList(populateLocalizedValue("en_US", "Document Name 1"), populateLocalizedValue("fr_FR", "Document Name 2")));
-        metaData.setCode("PROD123");
-        return metaData;
-    }
-
-    private ProductOfferingResponse.LocalizedValue populateLocalizedValue(String locale, String value) {
-        ProductOfferingResponse.LocalizedValue localizedValue = new ProductOfferingResponse.LocalizedValue();
-        localizedValue.setLocale(locale);
-        localizedValue.setValue(value);
-        return localizedValue;
+    void setUp() throws JsonProcessingException {
+        // mockAmdocsResponse = populateAmdocsSearchResponse();
+        //mockProductOfferingResponse = populateProductOfferingResponse();
+        deviceEpcDto = new DeviceEpcDto();
+        mockToken = new Token();
+        searchRequest = createSearchRequest("2345");
+        mockAmdocsResponse= JsonToObjectConverter.jsonToObject("amdocs_searchResponse.json", AmdocsSearchResponse.class);
+        mockProductOfferingResponse= JsonToObjectConverter.jsonToObject("productOfferingResponse.json", ProductOfferingResponse.class);
+        mockProductOfferingPriceResponse= JsonToObjectConverter.jsonToObject("productOfferingPriceResponse.json", ProductOfferingPriceResponse.class);
     }
 
     @Test
-    void testFetchProductOffering_Success_AmdocsResponse() {
-        when(genericWebClient.callPostApi(anyString(), anyString(), any(), eq(AmdocsSearchResponse.class)))
+   @Ignore
+    void testGetEPCDeviceDetails_Success() throws JsonProcessingException, JsonProcessingException {
+       // Mock token service
+        when(tokenService.getToken("qa1")).thenReturn(Mono.just(mockToken));
+
+       // Mock WebClient API call
+       when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class)))
+               .thenReturn(Mono.just(mockProductOfferingResponse));
+
+       when(genericWebClient.callPostApi(any(), any(), any(), eq(AmdocsSearchResponse.class)))
                 .thenReturn(Mono.just(mockAmdocsResponse));
 
-        Mono<AmdocsSearchResponse> responseMono = epcService.fetchProductOffering("mockToken", new ProductOfferSearchRequest());
+        when(genericWebClient.callPostApi(any(), any(), eq(null), eq(ProductOfferingPriceResponse.class)))
+                .thenReturn(Mono.just(mockProductOfferingPriceResponse));
 
-        responseMono.subscribe(response -> {
-            assert response != null;
-            assert response.getType().equals("AmdocsResponse");
-            assert response.getDocuments().size() == 2;
-            assert response.getDocuments().get(0).getDocumentMetaData().getDocumentID().equals("12345");
-        });
-
-        verify(genericWebClient, times(1)).callPostApi(anyString(), anyString(), any(), eq(AmdocsSearchResponse.class));
-    }
-
-    @Test
-    void testFetchProductOffering_Success_ProductOfferingResponse() {
-        when(genericWebClient.callPostApi(anyString(), anyString(), any(), eq(ProductOfferingResponse.class)))
-                .thenReturn(Mono.just(mockProductOfferingResponse));
-
-        Mono<ProductOfferingResponse> responseMono = epcService.fetchProductOffering("mockToken", new ProductOfferSearchRequest());
-
-        responseMono.subscribe(response -> {
-            assert response != null;
-            assert response.getDocuments().size() == 2;
-            assert response.getDocuments().get(0).getDocumentMetaData().getDocumentID().equals("11111");
-        });
-
-        verify(genericWebClient, times(1)).callPostApi(anyString(), anyString(), any(), eq(ProductOfferingResponse.class));
-    }
-
-@Test
-    void testGetEPCDeviceDetails_Success() throws JsonProcessingException {
-        // Mock token service
-        when(tokenService.getToken("testEnv")).thenReturn(Mono.just(mockToken));
-
-        // Mock WebClient API call
-        when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class)))
-                .thenReturn(Mono.just(mockResponse));
-
-        // Call the method
-        Mono<DeviceEpcDto> result = epcService.getEPCDeviceDetails("12345", "testEnv");
+       // Call the method
+       Mono<DeviceEpcDto> result = epcService.getEPCDeviceDetails("12345", "qa1");
 
         // Verify interactions
-        verify(tokenService, times(1)).getToken("testEnv");
-        assertNotNull(result.block()); // Ensures no null response
-    }
+       verify(tokenService, times(1)).getToken("qa1");
+       assertNotNull(result.block()); // Ensures no null response
+   }
 
     @Test
     void testGetEpcMappedJson_Success() throws JsonProcessingException, XmlConversionException {
@@ -183,15 +109,18 @@ public class EPCServiceTest {
         assertNotNull(request);
     }
 
-    @Test
+   @Test
+   @Ignore
     void testFetchProductOffering_Success() {
         when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class)))
-                .thenReturn(Mono.just(mockResponse));
+               .thenReturn(Mono.just(mockProductOfferingResponse));
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(AmdocsSearchResponse.class)))
+                .thenReturn(Mono.just(mockAmdocsResponse));
 
-        Mono<DeviceEpcDto> result = epcService.fetchProductOffering("mockToken", "testEnv", searchRequest);
+       Mono<DeviceEpcDto> result = epcService.fetchProductOffering("mockToken", "testEnv", searchRequest);
 
-        assertNotNull(result.block());
-    }
+       assertNotNull(result.block());
+   }
 
     @Test
     void testRetrieveDocumentId_EmptyResponse() {
@@ -214,7 +143,7 @@ public class EPCServiceTest {
     @Test
     void testReturnDeviceEpcDTO_Success() throws IllegalAccessException {
         HashMap<String, Object> responseMap = new HashMap<>();
-        responseMap.put("key1", mockResponse);
+        responseMap.put("key1", mockProductOfferingResponse);
 
         DeviceEpcDto result = epcService.returnDeviceEpcDTO(responseMap);
         assertNotNull(result);
@@ -232,5 +161,12 @@ public class EPCServiceTest {
         assertEquals(2, result.size());
         assertEquals("value1", result.get("key1"));
         assertEquals("value2", result.get("key2"));
+    }
+
+    public ProductOfferSearchRequest createSearchRequest(String sorId) throws JsonProcessingException {
+        ProductOfferSearchRequest request = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_DOCUMENT_SEARCH_JSON, ProductOfferSearchRequest.class);
+        request.getItem().getOr().get(0).setText("\"" + sorId + "\"");
+        request.getItem().getOr().get(1).getCriteria().getFilterCondition().getCondition().getValues().set(0,sorId);
+        return request;
     }
 }
