@@ -19,6 +19,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.BodyInserters;
 import reactor.core.publisher.Mono;
 
 import java.io.InputStream;
@@ -106,14 +107,39 @@ public class EPCService {
         return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsProductApi(env), productOfferingRequest, ProductOfferingResponse.class)
                 .flatMap(poResponse -> {
                     String productSpecificationId = poResponse.getDocuments().get(0).getDocument().getProductSpecification().getId();
-                    return fetchProductDetails(bearerToken, env, poResponse, productSpecificationId);
+                    Mono<ProductOfferingPriceResponse> monoProductOfferingPrice = fetchPriceRecords(poResponse,bearerToken,env);
+
+                    return fetchProductDetails(bearerToken, env, poResponse,monoProductOfferingPrice, productSpecificationId);
                 });
+    }
+
+    public Mono<ProductOfferingPriceResponse> fetchPriceRecords(ProductOfferingResponse poResponse, String bearerToken,String env){
+        try {
+            List<ProductOfferingResponse.Document> documents = poResponse.getDocuments();
+            String price = null;
+            for (ProductOfferingResponse.Document document : documents) {
+                if (document.getEntityType().equalsIgnoreCase(AmdocsConstants.PRODUCT_OFFERING)) {
+                    ProductOfferingResponse.DocumentContent documentContent = document.getDocument();
+                    List<ProductOfferingResponse.ProductOfferingPrice> prices = documentContent.getProductOfferingPrice();
+                    if (prices != null) {
+                        price = prices.get(0).getId();
+                    }
+                }
+            }
+            String productOfferingPriceUrl = epcConfiguration.getProductOfferingPrice(env);
+            productOfferingPriceUrl = String.format(productOfferingPriceUrl, price);
+
+            return genericWebClient.callPostApi(bearerToken, productOfferingPriceUrl, null, ProductOfferingPriceResponse.class);
+        }
+        catch(Exception e){
+            return Mono.just(new ProductOfferingPriceResponse());
+        }
     }
 
     /**
      * Fetches product details including Bundled Product Specification.
      */
-    public Mono<DeviceEpcDto> fetchProductDetails(String bearerToken, String env, ProductOfferingResponse poResponse, String productSpecificationId) {
+    public Mono<DeviceEpcDto> fetchProductDetails(String bearerToken, String env, ProductOfferingResponse poResponse,Mono<ProductOfferingPriceResponse> monoProductOfferingPrice, String productSpecificationId) {
         ProductOfferingRequest productSpecificationRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class);
         productSpecificationRequest.getIds().get(0).setId(productSpecificationId);
 
@@ -123,11 +149,11 @@ public class EPCService {
 
         return monoProductSpecificationSkuResponse.flatMap(psskuResponse -> {
             if (psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification() != null) {
-                return fetchBundledProductDetails(bearerToken, env, poResponse, psskuResponse);
+                return fetchBundledProductDetails(bearerToken, env, poResponse,monoProductOfferingPrice, psskuResponse);
             } else {
                 return fetchProductOfferingGroup(bearerToken, poResponse, env)
                         .flatMap(monoProductOfferingGroupResponse ->
-                                zipAndTransformResponse(poResponse, monoProductSpecificationSkuResponse, Mono.just(new ProductOfferingResponse()), Mono.just(monoProductOfferingGroupResponse))
+                                zipAndTransformResponse(poResponse,monoProductOfferingPrice, monoProductSpecificationSkuResponse, Mono.just(new ProductOfferingResponse()), Mono.just(monoProductOfferingGroupResponse))
                         );
             }
         });
@@ -136,7 +162,7 @@ public class EPCService {
     /**
      * Fetches Bundled Product Specification and continues processing.
      */
-    public Mono<DeviceEpcDto> fetchBundledProductDetails(String bearerToken, String env, ProductOfferingResponse poResponse, ProductOfferingResponse psskuResponse) {
+    public Mono<DeviceEpcDto> fetchBundledProductDetails(String bearerToken, String env, ProductOfferingResponse poResponse, Mono<ProductOfferingPriceResponse> monoProductOfferingPrice, ProductOfferingResponse psskuResponse) {
         String bundledProductId = psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification().get(0).getId();
 
         ProductOfferingRequest productSpecificationPrdRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class);
@@ -148,7 +174,7 @@ public class EPCService {
 
         return fetchProductOfferingGroup(bearerToken, poResponse, env)
                 .flatMap(monoProductOfferingGroupResponse ->
-                        zipAndTransformResponse(poResponse, Mono.just(psskuResponse), monoProductSpecificationPrdResponse, Mono.just(monoProductOfferingGroupResponse))
+                        zipAndTransformResponse(poResponse, monoProductOfferingPrice,Mono.just(psskuResponse), monoProductSpecificationPrdResponse, Mono.just(monoProductOfferingGroupResponse))
                 );
     }
 
@@ -179,7 +205,7 @@ public class EPCService {
      */
     public String retrieveDocumentId(AmdocsSearchResponse amdocsSearchResponse) {
         return amdocsSearchResponse.getDocuments().stream()
-                .filter(document -> document != null && "productOfferingGroup".equalsIgnoreCase(document.getEntityType()))
+                .filter(document -> document != null && AmdocsConstants.PRODUCT_OFFERING_GROUP.equalsIgnoreCase(document.getEntityType()))
                 .map(document -> document.getDocumentMetaData().getDocumentID())
                 .findFirst()
                 .orElse(StringUtils.EMPTY);
@@ -190,21 +216,24 @@ public class EPCService {
      */
     public Mono<DeviceEpcDto> zipAndTransformResponse(
             ProductOfferingResponse poResponse,
+            Mono<ProductOfferingPriceResponse> monoProductOfferingPrice,
             Mono<ProductOfferingResponse> monoProductSpecificationSkuResponse,
             Mono<ProductOfferingResponse> monoProductSpecificationPrdResponse,
             Mono<ProductOfferingResponse> monoProductOfferingGroupResponse
     ) {
         return Mono.zip(
                 Mono.just(poResponse),
+                monoProductOfferingPrice,
                 monoProductSpecificationSkuResponse,
                 monoProductSpecificationPrdResponse,
                 monoProductOfferingGroupResponse
         ).map(tuple -> {
             HashMap<String, Object> responseMap = new HashMap<>();
             responseMap.put(AmdocsConstants.PRODUCT_OFFER, tuple.getT1());
-            responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_SKU, tuple.getT2());
-            responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_PRD, tuple.getT3());
-            responseMap.put(AmdocsConstants.PRODUCT_OFFER_GROUP, tuple.getT4());
+            responseMap.put(AmdocsConstants.PRODUCT_OFFER_PRICE,tuple.getT2());
+            responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_SKU, tuple.getT3());
+            responseMap.put(AmdocsConstants.PRODUCT_SPECIFICATION_PRD, tuple.getT4());
+            responseMap.put(AmdocsConstants.PRODUCT_OFFER_GROUP, tuple.getT5());
             try {
                 return returnDeviceEpcDTO(responseMap);
             } catch (IllegalAccessException e) {
@@ -231,14 +260,21 @@ public class EPCService {
             else{
                 populateMapForFieldsWithLocalizedvalues(characteristic,map);
             }
-            map.put("displayName",document.getDocumentMetaData().getDocumentName().get(0).getValue());
+            map.put(AmdocsConstants.DISPLAYNAME,document.getDocumentMetaData().getDocumentName().get(0).getValue());
         });
         return map;
     }
 
     public void populateMapForFieldsWithLocalizedvalues(ProductOfferingResponse.Characteristic characteristic,HashMap<String,String> map){
+        StringBuilder sb = new StringBuilder();
+        int size =0;
         if(CollectionUtils.isNotEmpty(characteristic.getValues())) {
-            map.put(characteristic.getName(), characteristic.getValues().get(0).getLocalizedValue().get(0).getValue());
+            for(ProductOfferingResponse.Value value : characteristic.getValues()){
+                sb.append(value.getLocalizedValue().get(0).getValue());
+                sb.append(",");
+            }
+            String finalString = sb.toString();
+            map.put(characteristic.getName(), finalString.substring(0,finalString.length()-1));
         }
         else{
           map.put(characteristic.getName(),null);
@@ -302,17 +338,86 @@ public class EPCService {
 
     public DeviceEpcDto returnDeviceEpcDTO(HashMap<String,Object> map) throws IllegalAccessException {
         List<Map<String,String>> list = new ArrayList<>();
-        for (String key : map.keySet()){
-            ProductOfferingResponse productOfferingResponse = (ProductOfferingResponse) map.get(key);
-            if(productOfferingResponse.getDocuments().get(0)!=null){
-                ProductOfferingResponse.Document productOfferingDocument = productOfferingResponse.getDocuments().get(0);
-                HashMap<String,String> epcMap = returnEpcMap(productOfferingDocument);
-                list.add(epcMap);
+        for (String key : map.keySet()) {
+            if (map.get(key) instanceof ProductOfferingPriceResponse) {
+                ProductOfferingPriceResponse productOfferingPriceResponse = (ProductOfferingPriceResponse) map.get(key);
+                HashMap<String,String> popMap = retreivePopMap(productOfferingPriceResponse);
+                list.add(popMap);
+
+            } else {
+                ProductOfferingResponse productOfferingResponse = (ProductOfferingResponse) map.get(key);
+                if (productOfferingResponse != null && productOfferingResponse.getDocuments() != null) {
+                    if (productOfferingResponse.getDocuments().get(0) != null) {
+                        ProductOfferingResponse.Document productOfferingDocument = productOfferingResponse.getDocuments().get(0);
+
+                        HashMap<String, String> epcMap = returnEpcMap(productOfferingDocument);
+                        if (key.equalsIgnoreCase(AmdocsConstants.PRODUCT_SPECIFICATION_PRD))
+                            addDocumenttoMap(epcMap, productOfferingResponse);
+                        list.add(epcMap);
+                    }
+                } else {
+                    log.info("ProductOfferingResponse is empty");
+                }
             }
         }
         Map<String,String> concatenatedMap = concatenateMapsIntoOne(list);
+        concatenatedMap = transformMap(concatenatedMap);
         DeviceEpcDto deviceDto= mapToDeviceEpcDTO(concatenatedMap);
         return deviceDto;
+    }
+    private Map<String,String> transformMap(Map<String,String> map){
+       String carrierValue =  map.get(AmdocsConstants.CARRIER);
+       if(carrierValue!=null && carrierValue.contains("|")){
+           carrierValue = carrierValue.split("\\|")[0];
+           carrierValue = carrierValue.trim();
+           map.put(AmdocsConstants.CARRIER,carrierValue);
+       }
+       return map;
+    }
+
+    private HashMap<String,String> retreivePopMap(ProductOfferingPriceResponse productOfferingPriceResponse){
+        List<ProductOfferingPriceResponse.PriceRecord> priceRecords = productOfferingPriceResponse.getPriceRecords();
+        HashMap<String,String> hashMap = new HashMap<>();
+        if(priceRecords!=null) {
+            for (ProductOfferingPriceResponse.PriceRecord record : priceRecords) {
+                String key = retreiveKey(record);
+                String value = retreiveValue(record);
+                hashMap.put(key, value);
+            }
+        }
+         return hashMap;
+
+    }
+    private String retreiveKey(ProductOfferingPriceResponse.PriceRecord priceRecord){
+        List<ProductOfferingPriceResponse. Parameter> parameters = priceRecord.getParameter();
+        String commitmentName = null;
+        String priceType = null;
+        for (ProductOfferingPriceResponse. Parameter parameter : parameters){
+            if(parameter.getName().equalsIgnoreCase(AmdocsConstants.COMMITMENT)){
+                commitmentName = parameter.getValue().getName();
+            }
+            if(parameter.getName().equalsIgnoreCase(AmdocsConstants.VZ_PRICE_TYPE)){
+                priceType = parameter.getValue().getName();
+            }
+        }
+        if(priceType!=null && priceType.equalsIgnoreCase(AmdocsConstants.CP))
+            return priceType + commitmentName;
+        else
+            return priceType;
+    }
+    private String retreiveValue(ProductOfferingPriceResponse.PriceRecord priceRecord){
+        List<ProductOfferingPriceResponse.Price> prices = priceRecord.getPrice();
+        String priceRecordValue= null;
+        for(ProductOfferingPriceResponse.Price price : prices){
+            priceRecordValue= price.getDutyFreeAmount().getValue();
+            priceRecordValue = priceRecordValue.contains(".") ? priceRecordValue.replaceFirst("\\.?0+$",""):priceRecordValue;
+        }
+        return priceRecordValue;
+    }
+
+    private void addDocumenttoMap(HashMap<String,String> epcMap,ProductOfferingResponse productOfferingResponse){
+
+        epcMap.put(AmdocsConstants.DOCUMENTNAME,productOfferingResponse.getDocuments().get(0).getDocumentMetaData().getDocumentName().get(0).getValue());
     }
 
     public Map<String,String> concatenateMapsIntoOne(List<Map<String,String>> mapList){
