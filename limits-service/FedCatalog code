@@ -69,3 +69,54 @@ public class FedCatalogGetDataService {
     }
 
 }
+----------------------------------------------------------------------------------
+@Component
+@Slf4j
+public class FedCatalogGetDataService {
+
+    private final FederatedDBConfiguration fedCatalogConfiguration;
+    private final SimpleJdbcCall simpleJdbcCall;
+
+    @Autowired
+    public FedCatalogGetDataService(FederatedDBConfiguration fedCatalogConfiguration, JdbcTemplate jdbcTemplate) {
+        this.fedCatalogConfiguration = fedCatalogConfiguration;
+        this.simpleJdbcCall = new SimpleJdbcCall(jdbcTemplate); // Initialize with a default JdbcTemplate
+    }
+
+    public Mono<Map<String, Object>> fedCatalogDeviceDetails(String sorId, String productType, String env) throws XmlConversionException {
+        String procedureName = retrieveStoredProcedure(productType);
+        if (procedureName.isBlank()) {
+            log.error("Invalid product type: {}", productType);
+            return Mono.error(new IllegalArgumentException("Invalid product type"));
+        }
+
+        // Reconfigure SimpleJdbcCall dynamically based on the environment
+        SimpleJdbcCall configuredJdbcCall = simpleJdbcCall
+                .withJdbcTemplate(fedCatalogConfiguration.jdbcTemplateForEnv(env))
+                .withSchemaName(EPCREP_SCHEMA)
+                .withProcedureName(procedureName)
+                .returningResultSet(DEVICE_INFO, new BeanPropertyRowMapper<>(LinkedCaseInsensitiveMap.class));
+
+        SqlParameterSource inParams = new MapSqlParameterSource().addValue(P_SOR_ID, sorId);
+        Map<String, Object> result = configuredJdbcCall.execute(inParams);
+
+        List<LinkedCaseInsensitiveMap<Object>> resultList = (List<LinkedCaseInsensitiveMap<Object>>) result.getOrDefault("P_RESULT_SET", Collections.emptyList());
+
+        if (resultList.isEmpty()) {
+            log.info("No records found for SOR ID: {} in environment: {}", sorId, env);
+            return Mono.just(Collections.emptyMap());
+        }
+
+        LinkedCaseInsensitiveMap<Object> caseInsensitiveMap = resultList.get(0);
+        return Mono.just(new HashMap<>(caseInsensitiveMap));
+    }
+
+    private String retrieveStoredProcedure(String productType) {
+        return switch (productType.toUpperCase()) {
+            case PROD_TYPE_DEVICE -> FEDCATALOG_SP_DEVICE;
+            case PROD_TYPE_ACCESSORY -> FEDCATALOG_SP_ACCESSORY;
+            default -> "";
+        };
+    }
+}
+
