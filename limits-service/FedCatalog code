@@ -1,27 +1,71 @@
-public HashMap<String,String> fedCatalogDeviceDetails(String sys, String acc_sku, String type) throws XmlConversionException {
+package com.vzw.tools.persistence.service;
 
-        SimpleJdbcCall simpleJdbcCall = new SimpleJdbcCall(fedCatalogConfiguration.jdbcTemplateForEnv("QA1"))
-                .withSchemaName("EPCREP")
-                .withProcedureName(FEDCATALOG_SP_DEVICE)
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vzw.tools.persistence.configuration.FederatedDBConfiguration;
+import com.vzw.tools.source.dao.DeviceDPIDAO;
+import com.vzw.tools.common.exception.ErrorMessages;
+import com.vzw.tools.common.exception.XmlConversionException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
+import org.springframework.jdbc.core.simple.SimpleJdbcCall;
+import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedCaseInsensitiveMap;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.math.BigDecimal;
+import java.util.*;
+
+import static com.vzw.tools.common.constant.CommonConstants.*;
+
+@Component
+@Slf4j
+public class FedCatalogGetDataService {
+
+    private final FederatedDBConfiguration fedCatalogConfiguration;
+
+    @Autowired
+    public FedCatalogGetDataService(FederatedDBConfiguration fedCatalogConfiguration) {
+        this.fedCatalogConfiguration = fedCatalogConfiguration;
+    }
+
+
+    public Mono<HashMap<String,String>> fedCatalogDeviceDetails(String sorId, String productType, String env) throws XmlConversionException {
+
+        SimpleJdbcCall simpleJdbcCall = new SimpleJdbcCall(fedCatalogConfiguration.jdbcTemplateForEnv(env))
+                .withSchemaName(EPCREP_SCHEMA)
+                .withProcedureName(retreiveStoredProcedure(productType))
                 .returningResultSet(DEVICE_INFO, new BeanPropertyRowMapper<>(HashMap.class));
         SqlParameterSource inParams = new MapSqlParameterSource()
-                .addValue("p_sor_id", "CLNRSMR765");
+                .addValue(P_SOR_ID, sorId);
 
         Map<String,Object> result = simpleJdbcCall.execute(inParams);
 
-       ArrayList<LinkedCaseInsensitiveMap<String>> al=  (ArrayList<LinkedCaseInsensitiveMap<String>>)result.get("P_RESULT_SET");
+       ArrayList<LinkedCaseInsensitiveMap<Object>> al=  (ArrayList<LinkedCaseInsensitiveMap<Object>>)result.get("P_RESULT_SET");
        HashMap<String,String> fedCatalogMap = new HashMap<>();
        if(al != null){
-           LinkedCaseInsensitiveMap caseInsensitiveMap = al.get(0);
-           fedCatalogMap = new HashMap<>(caseInsensitiveMap);
-           return (fedCatalogMap);
+           LinkedCaseInsensitiveMap<Object> caseInsensitiveMap = al.get(0);
+           for(Map.Entry<String,Object> entry : caseInsensitiveMap.entrySet() ){
+               fedCatalogMap.put(entry.getKey(),entry.getValue()!=null ? entry.getValue().toString():null);
+           }
+           return Mono.just(fedCatalogMap);
        }
        else {
-           return (fedCatalogMap);
+           return Mono.just(fedCatalogMap);
        }
     }
--------------------------------------------------------------------------------------------------------------------
-{
-    "details": "JSON encoding error: class java.math.BigDecimal cannot be cast to class java.lang.String (java.math.BigDecimal and java.lang.String are in module java.base of loader 'bootstrap')",
-    "error": "Internal server error"
+
+    public String retreiveStoredProcedure(String productType){
+        if(productType.equalsIgnoreCase(PROD_TYPE_DEVICE))
+            return FEDCATALOG_SP_DEVICE;
+        else if(productType.equalsIgnoreCase(PROD_TYPE_ACCESSORY))
+            return FEDCATALOG_SP_ACCESSORY;
+        else {
+            return " ";
+        }
+    }
+
 }
