@@ -1,0 +1,36 @@
+package com.vzw.tools.common.util;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+
+@Component
+public class GenericWebClient {
+    private final WebClient webClient;
+
+    @Autowired
+    public GenericWebClient(WebClient webClient) {
+        this.webClient = webClient;
+    }
+
+    public <T, R> Mono<R> callPostApi(String token, String apiPath, T requestBody,
+                                      Class<R> responseType) {
+        if(requestBody!=null) {
+            return webClient.post().uri(apiPath)
+                    .header("Authorization", token)
+                    .header("Content-Type", "application/json")
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(responseType);
+        }
+        else{
+            return webClient.post().uri(apiPath)
+                    .header("Authorization", token)
+                    .header("Content-Type", "application/json")
+                    //.bodyValue(requestBody == null ? Mono.empty() : requestBody)
+                    .retrieve()
+                    .bodyToMono(responseType);
+        }
+    }
+}
