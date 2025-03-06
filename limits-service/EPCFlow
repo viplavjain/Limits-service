@@ -1,0 +1,12 @@
+(i)  Generate a token.
+(ii) Hit the product offer search api .....v1/search/combined(For fetching the document_id from the response) and 
+     fetch the documentId.
+     Inside documents --> documentMetadata --> documentId.
+
+(iii) Hit the product offer json fetch api .....v1/search/related/ids passing the documentId in the id of ids array in 
+product offer json fetch request.
+   Request    
+"ids" :[{
+                "id" : "documentId"
+             }]
+
