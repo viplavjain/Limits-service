@@ -34,3 +34,55 @@ public class GenericWebClient {
         }
     }
 }
+-----------------------------------------------------------
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
+
+@Component
+public class GenericWebClient {
+    private static final Logger log = LoggerFactory.getLogger(GenericWebClient.class);
+
+    private final WebClient webClient;
+
+    @Autowired
+    public GenericWebClient(WebClient webClient) {
+        this.webClient = webClient;
+    }
+
+    public <T, R> Mono<R> callPostApi(String token, String apiPath, T requestBody, Class<R> responseType) {
+        log.info("Calling POST API: {}", apiPath);
+
+        return webClient.post()
+                .uri(apiPath)
+                .header("Authorization", token)
+                .header("Content-Type", "application/json")
+                .bodyValue(requestBody != null ? requestBody : Mono.empty())
+                .retrieve()
+                .bodyToMono(responseType)
+                .doOnSuccess(response -> log.info("Received response from API: {}", apiPath))
+                .doOnError(error -> log.error("Error occurred while calling API: {}", apiPath, error))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    log.error("API call failed with status code: {}, body: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
+                    return getDefaultResponse(responseType);
+                })
+                .onErrorResume(Exception.class, ex -> {
+                    log.error("Unexpected error occurred while calling API: {}", apiPath, ex);
+                    return getDefaultResponse(responseType);
+                });
+    }
+
+    private <R> Mono<R> getDefaultResponse(Class<R> responseType) {
+        try {
+            return Mono.just(responseType.getDeclaredConstructor().newInstance());
+        } catch (Exception e) {
+            log.error("Failed to create a default instance of response type: {}", responseType.getSimpleName(), e);
+            return Mono.empty();
+        }
+    }
+}
+
