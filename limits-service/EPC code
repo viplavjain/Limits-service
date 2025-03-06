@@ -8,6 +8,7 @@ import com.vzw.tools.authoring.dto.DeviceEpcDto;
 import com.vzw.tools.authoring.entity.*;
 import com.vzw.tools.common.constant.AmdocsConstants;
 import com.vzw.tools.common.constant.CommonConstants;
+import com.vzw.tools.common.exception.ConverterException;
 import com.vzw.tools.common.exception.XmlConversionException;
 import com.vzw.tools.common.service.TokenService;
 import com.vzw.tools.common.util.GenericWebClient;
@@ -60,11 +61,11 @@ public class EPCService {
         return epcMapJson;
     }
 
-    public Map<String, String> getEpcMappedJson(String sorId, String sys) throws XmlConversionException, JsonProcessingException {
+    public Map<String, String> getEpcMappedJson(String sorId, String sys) throws XmlConversionException, JsonProcessingException, ConverterException {
         return getEpcMappedJson(getEPCDeviceDetails(sorId, sys).block());
     }
 
-    public Mono<DeviceEpcDto> getEPCDeviceDetails(String sorId, String env) throws JsonProcessingException {
+    public Mono<DeviceEpcDto> getEPCDeviceDetails(String sorId, String env) throws JsonProcessingException, ConverterException {
         log.info("getEPCDeviceDetails API called");
 
         Mono<Token> tokenMono = tokenService.getToken(env);
@@ -79,7 +80,7 @@ public class EPCService {
     /**
      * Creates the search request for fetching document details for product offer.
      */
-    public ProductOfferSearchRequest createSearchRequest(String sorId) throws JsonProcessingException {
+    public ProductOfferSearchRequest createSearchRequest(String sorId) throws JsonProcessingException, ConverterException {
         ProductOfferSearchRequest request = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_DOCUMENT_SEARCH_JSON, ProductOfferSearchRequest.class);
         request.getItem().getOr().get(0).setText("\"" + sorId + "\"");
         request.getItem().getOr().get(1).getCriteria().getFilterCondition().getCondition().getValues().set(0,sorId);
@@ -93,14 +94,18 @@ public class EPCService {
         return genericWebClient.callPostApi(bearerToken, epcConfiguration.getAmdocsSearchApi(env), amdocsSearchRequest, AmdocsSearchResponse.class)
                 .flatMap(searchResponse -> {
                     String documentID = searchResponse.getDocuments().get(0).getDocumentMetaData().getDocumentID();
-                    return fetchProductSpecification(bearerToken, env, documentID);
+                    try {
+                        return fetchProductSpecification(bearerToken, env, documentID);
+                    } catch (ConverterException e) {
+                        throw new RuntimeException(e);
+                    }
                 });
     }
 
     /**
      * Fetches Product Specification using the Product Offering ID.
      */
-    public Mono<DeviceEpcDto> fetchProductSpecification(String bearerToken, String env, String documentID) {
+    public Mono<DeviceEpcDto> fetchProductSpecification(String bearerToken, String env, String documentID) throws ConverterException {
         ProductOfferingRequest productOfferingRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFER_JSON, ProductOfferingRequest.class);
         productOfferingRequest.getIds().get(0).setId(documentID);
 
@@ -109,7 +114,11 @@ public class EPCService {
                     String productSpecificationId = poResponse.getDocuments().get(0).getDocument().getProductSpecification().getId();
                     Mono<ProductOfferingPriceResponse> monoProductOfferingPrice = fetchPriceRecords(poResponse,bearerToken,env);
 
-                    return fetchProductDetails(bearerToken, env, poResponse,monoProductOfferingPrice, productSpecificationId);
+                    try {
+                        return fetchProductDetails(bearerToken, env, poResponse,monoProductOfferingPrice, productSpecificationId);
+                    } catch (ConverterException e) {
+                        throw new RuntimeException(e);
+                    }
                 });
     }
 
@@ -139,7 +148,7 @@ public class EPCService {
     /**
      * Fetches product details including Bundled Product Specification.
      */
-    public Mono<DeviceEpcDto> fetchProductDetails(String bearerToken, String env, ProductOfferingResponse poResponse,Mono<ProductOfferingPriceResponse> monoProductOfferingPrice, String productSpecificationId) {
+    public Mono<DeviceEpcDto> fetchProductDetails(String bearerToken, String env, ProductOfferingResponse poResponse,Mono<ProductOfferingPriceResponse> monoProductOfferingPrice, String productSpecificationId) throws ConverterException {
         ProductOfferingRequest productSpecificationRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class);
         productSpecificationRequest.getIds().get(0).setId(productSpecificationId);
 
@@ -149,12 +158,20 @@ public class EPCService {
 
         return monoProductSpecificationSkuResponse.flatMap(psskuResponse -> {
             if (psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification() != null) {
-                return fetchBundledProductDetails(bearerToken, env, poResponse,monoProductOfferingPrice, psskuResponse);
+                try {
+                    return fetchBundledProductDetails(bearerToken, env, poResponse,monoProductOfferingPrice, psskuResponse);
+                } catch (ConverterException e) {
+                    throw new RuntimeException(e);
+                }
             } else {
-                return fetchProductOfferingGroup(bearerToken, poResponse, env)
-                        .flatMap(monoProductOfferingGroupResponse ->
-                                zipAndTransformResponse(poResponse,monoProductOfferingPrice, monoProductSpecificationSkuResponse, Mono.just(new ProductOfferingResponse()), Mono.just(monoProductOfferingGroupResponse))
-                        );
+                try {
+                    return fetchProductOfferingGroup(bearerToken, poResponse, env)
+                            .flatMap(monoProductOfferingGroupResponse ->
+                                    zipAndTransformResponse(poResponse,monoProductOfferingPrice, monoProductSpecificationSkuResponse, Mono.just(new ProductOfferingResponse()), Mono.just(monoProductOfferingGroupResponse))
+                            );
+                } catch (ConverterException e) {
+                    throw new RuntimeException(e);
+                }
             }
         });
     }
@@ -162,7 +179,7 @@ public class EPCService {
     /**
      * Fetches Bundled Product Specification and continues processing.
      */
-    public Mono<DeviceEpcDto> fetchBundledProductDetails(String bearerToken, String env, ProductOfferingResponse poResponse, Mono<ProductOfferingPriceResponse> monoProductOfferingPrice, ProductOfferingResponse psskuResponse) {
+    public Mono<DeviceEpcDto> fetchBundledProductDetails(String bearerToken, String env, ProductOfferingResponse poResponse, Mono<ProductOfferingPriceResponse> monoProductOfferingPrice, ProductOfferingResponse psskuResponse) throws ConverterException {
         String bundledProductId = psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification().get(0).getId();
 
         ProductOfferingRequest productSpecificationPrdRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_SPECIFICATION_JSON, ProductOfferingRequest.class);
@@ -181,7 +198,7 @@ public class EPCService {
     /**
      * Fetches the Product Offering Group (POG) response.
      */
-    public Mono<ProductOfferingResponse> fetchProductOfferingGroup(String bearerToken, ProductOfferingResponse poResponse, String env) {
+    public Mono<ProductOfferingResponse> fetchProductOfferingGroup(String bearerToken, ProductOfferingResponse poResponse, String env) throws ConverterException {
         ProductOfferingGroupSearchRequest productOfferingGroupSearchRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFERGROUP_SEARCH_JSON, ProductOfferingGroupSearchRequest.class);
         ProductOfferingRequest productOfferingGroupRequest = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_PRODUCT_OFFERGROUP_JSON, ProductOfferingRequest.class);
 
@@ -325,11 +342,9 @@ public class EPCService {
                     epcMap.put(newKey, value); // Add new key-value pair
                 }
             }
-
-            // Print the updated epcMap
-            System.out.println("Updated epcMap: " + epcMap);
+            log.info("epcMap genericKeyMap updated: " + epcMap);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Error while updating epcMap genericKeyMap: " + e.getMessage());
         }
 
         return epcMap;
@@ -410,7 +425,7 @@ public class EPCService {
         String priceRecordValue= null;
         for(ProductOfferingPriceResponse.Price price : prices){
             priceRecordValue= price.getDutyFreeAmount().getValue();
-            priceRecordValue = priceRecordValue.contains(".") ? priceRecordValue.replaceFirst("\\.?0+$",""):priceRecordValue;
+            priceRecordValue = priceRecordValue.contains(CommonConstants.STRING_DOT) ? priceRecordValue.replaceFirst(AmdocsConstants.PRICE_CODE_REGEX,CommonConstants.EMPTY_STRING):priceRecordValue;
         }
         return priceRecordValue;
     }
