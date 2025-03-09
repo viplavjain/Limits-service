@@ -5,6 +5,7 @@ import com.vzw.tools.authoring.configuration.EpcConfiguration;
 import com.vzw.tools.authoring.dto.DeviceEpcDto;
 import com.vzw.tools.authoring.entity.*;
 import com.vzw.tools.common.constant.AmdocsConstants;
+import com.vzw.tools.common.exception.ConverterException;
 import com.vzw.tools.common.exception.XmlConversionException;
 import com.vzw.tools.common.service.TokenService;
 import com.vzw.tools.common.util.GenericWebClient;
@@ -58,7 +59,7 @@ public class EPCServiceTest {
     private Token mockToken;
 
     @BeforeEach
-    void setUp() throws JsonProcessingException {
+    void setUp() throws JsonProcessingException, ConverterException {
         // mockAmdocsResponse = populateAmdocsSearchResponse();
         //mockProductOfferingResponse = populateProductOfferingResponse();
         deviceEpcDto = new DeviceEpcDto();
@@ -71,18 +72,19 @@ public class EPCServiceTest {
 
     @Test
    @Ignore
-    void testGetEPCDeviceDetails_Success() throws JsonProcessingException, JsonProcessingException {
+    void testGetEPCDeviceDetails_Success() throws JsonProcessingException, JsonProcessingException, ConverterException {
        // Mock token service
         when(tokenService.getToken("qa1")).thenReturn(Mono.just(mockToken));
+        when(epcConfiguration.getProductOfferingPrice("qa1")).thenReturn("https://catalogone-apigw-qa1b-at-npge.ebiz.verizon.com/catalogManagement/pricing/v2/price/%s/viewPriceRecord?level=WORKSTREAM");
 
        // Mock WebClient API call
-       when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class)))
+       when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class),any()))
                .thenReturn(Mono.just(mockProductOfferingResponse));
 
-       when(genericWebClient.callPostApi(any(), any(), any(), eq(AmdocsSearchResponse.class)))
+       when(genericWebClient.callPostApi(any(), any(), any(), eq(AmdocsSearchResponse.class),any()))
                 .thenReturn(Mono.just(mockAmdocsResponse));
 
-        when(genericWebClient.callPostApi(any(), any(), eq(null), eq(ProductOfferingPriceResponse.class)))
+        when(genericWebClient.callPostApi(any(), any(), eq(null), eq(ProductOfferingPriceResponse.class),any()))
                 .thenReturn(Mono.just(mockProductOfferingPriceResponse));
 
        // Call the method
@@ -92,19 +94,9 @@ public class EPCServiceTest {
        verify(tokenService, times(1)).getToken("qa1");
        assertNotNull(result.block()); // Ensures no null response
    }
-/*org.mockito.exceptions.misusing.UnnecessaryStubbingException: 
-Unnecessary stubbings detected.
-Clean & maintainable test code requires zero unnecessary code.
-Following stubbings are unnecessary (click to navigate to relevant line of code):
-  1. -> at com.vzw.tools.authoring.service.EPCServiceTest.testGetEPCDeviceDetails_Success(EPCServiceTest.java:85)
-Please remove unnecessary stubbings or use 'lenient' strictness. More info: javadoc for UnnecessaryStubbingException class.
-
-	at org.mockito.junit.jupiter.MockitoExtension.afterEach(MockitoExtension.java:197)
-	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
-	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)*/
 
     @Test
-    void testGetEpcMappedJson_Success() throws JsonProcessingException, XmlConversionException {
+    void testGetEpcMappedJson_Success() throws JsonProcessingException, XmlConversionException, ConverterException {
         EPCService spyService = spy(epcService);
         doReturn(Mono.just(deviceEpcDto)).when(spyService).getEPCDeviceDetails(any(), any());
 
@@ -114,7 +106,7 @@ Please remove unnecessary stubbings or use 'lenient' strictness. More info: java
     }
 
     @Test
-    void testCreateSearchRequest_Success() throws JsonProcessingException {
+    void testCreateSearchRequest_Success() throws JsonProcessingException, ConverterException {
         ProductOfferSearchRequest request = epcService.createSearchRequest("12345");
         assertNotNull(request);
     }
@@ -122,9 +114,10 @@ Please remove unnecessary stubbings or use 'lenient' strictness. More info: java
    @Test
    @Ignore
     void testFetchProductOffering_Success() {
-        when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class)))
+       when(epcConfiguration.getProductOfferingPrice("qa1")).thenReturn("https://catalogone-apigw-qa1b-at-npge.ebiz.verizon.com/catalogManagement/pricing/v2/price/%s/viewPriceRecord?level=WORKSTREAM");
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class),any()))
                .thenReturn(Mono.just(mockProductOfferingResponse));
-        when(genericWebClient.callPostApi(any(), any(), any(), eq(AmdocsSearchResponse.class)))
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(AmdocsSearchResponse.class),any()))
                 .thenReturn(Mono.just(mockAmdocsResponse));
 
        Mono<DeviceEpcDto> result = epcService.fetchProductOffering("mockToken", "testEnv", searchRequest);
@@ -173,7 +166,7 @@ Please remove unnecessary stubbings or use 'lenient' strictness. More info: java
         assertEquals("value2", result.get("key2"));
     }
 
-    public ProductOfferSearchRequest createSearchRequest(String sorId) throws JsonProcessingException {
+    public ProductOfferSearchRequest createSearchRequest(String sorId) throws JsonProcessingException, ConverterException {
         ProductOfferSearchRequest request = JsonToObjectConverter.jsonToObject(AmdocsConstants.AMDOCS_DOCUMENT_SEARCH_JSON, ProductOfferSearchRequest.class);
         request.getItem().getOr().get(0).setText("\"" + sorId + "\"");
         request.getItem().getOr().get(1).getCriteria().getFilterCondition().getCondition().getValues().set(0,sorId);
