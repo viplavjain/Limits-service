@@ -163,7 +163,7 @@ public class EPCService {
                     try {
                         return fetchProductDetails(bearerToken, env, poResponse,monoProductOfferingPrice, productSpecificationId);
                     } catch (Exception e) {
-                        return Mono.just(new DeviceEpcDto());
+                        return zipAndTransformResponse(poResponse,monoProductOfferingPrice,Mono.empty(),Mono.empty(),Mono.empty());
                     }
                 }).onErrorResume(e -> {
                     log.error("Error occurred while calling Product Offer  api:",e);
@@ -209,8 +209,9 @@ public class EPCService {
             if (psskuResponse.getDocuments().get(0).getDocument().getBundledProductSpecification() != null) {
                 try {
                     return fetchBundledProductDetails(bearerToken, env, poResponse,monoProductOfferingPrice, psskuResponse);
-                } catch (ConverterException e) {
-                    throw new RuntimeException(e);
+                } catch (Exception e) {
+                    log.info("Error in fetchBundledProductDetails api",e);
+                    return zipAndTransformResponse(poResponse,monoProductOfferingPrice,monoProductSpecificationSkuResponse,Mono.empty(),Mono.empty());
                 }
             } else {
                 try {
@@ -218,10 +219,13 @@ public class EPCService {
                             .flatMap(monoProductOfferingGroupResponse ->
                                     zipAndTransformResponse(poResponse,monoProductOfferingPrice, monoProductSpecificationSkuResponse, Mono.just(new ProductOfferingResponse()), Mono.just(monoProductOfferingGroupResponse))
                             );
-                } catch (ConverterException e) {
-                    throw new RuntimeException(e);
+                } catch (Exception e) {
+                    return Mono.just(new DeviceEpcDto());
                 }
             }
+        }).onErrorResume(e -> {
+            log.error("Error occurred while calling product specification sku api:",e);
+            return zipAndTransformResponse(poResponse,monoProductOfferingPrice,monoProductSpecificationSkuResponse,Mono.empty(),Mono.empty());
         });
     }
 
@@ -406,13 +410,11 @@ public class EPCService {
     public DeviceEpcDto returnDeviceEpcDTO(HashMap<String,Object> map) throws IllegalAccessException {
         List<Map<String,String>> list = new ArrayList<>();
         for (String key : map.keySet()) {
-            if (map.get(key) instanceof ProductOfferingPriceResponse) {
-                ProductOfferingPriceResponse productOfferingPriceResponse = (ProductOfferingPriceResponse) map.get(key);
+            if (map.get(key) instanceof ProductOfferingPriceResponse productOfferingPriceResponse) {
                 HashMap<String,String> popMap = retreivePopMap(productOfferingPriceResponse);
                 list.add(popMap);
 
-            } else {
-                ProductOfferingResponse productOfferingResponse = (ProductOfferingResponse) map.get(key);
+            } else if(map.get(key) instanceof ProductOfferingResponse productOfferingResponse) {
                 if (productOfferingResponse != null && productOfferingResponse.getDocuments() != null) {
                     if (productOfferingResponse.getDocuments().get(0) != null) {
                         ProductOfferingResponse.Document productOfferingDocument = productOfferingResponse.getDocuments().get(0);
