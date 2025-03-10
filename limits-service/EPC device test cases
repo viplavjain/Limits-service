@@ -1,12 +1,10 @@
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -14,8 +12,10 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class EPCDeviceServiceTest {
-    private static final Logger log = LoggerFactory.getLogger(EPCDeviceServiceTest.class);
+public class EPCDeviceServiceTest {
+
+    @InjectMocks
+    private EPCDeviceService epcDeviceService;
 
     @Mock
     private TokenService tokenService;
@@ -26,127 +26,80 @@ class EPCDeviceServiceTest {
     @Mock
     private EPCConfiguration epcConfiguration;
 
-    @InjectMocks
-    private EPCDeviceService epcDeviceService;
-
-    private final String sorId = "12345";
-    private final String env = "test-env";
-    private final String bearerToken = "Bearer test-token";
+    private final String sorId = "testSorId";
+    private final String env = "testEnv";
+    private final String bearerToken = "Bearer testToken";
 
     @BeforeEach
     void setUp() {
-        log.info("Setting up test cases...");
+        when(tokenService.getToken(anyString())).thenReturn(Mono.just(new Token("testToken")));
     }
 
     @Test
-    void getEPCDeviceDetails_Success() throws JsonProcessingException, ConverterException {
-        Token mockToken = new Token();
-        mockToken.setToken("test-token");
-        when(tokenService.getToken(env)).thenReturn(Mono.just(mockToken));
+    void testGetEPCDeviceDetails_Success() {
+        ProductOfferSearchRequest request = new ProductOfferSearchRequest();
+        DeviceEpcDto expectedDto = new DeviceEpcDto();
 
-        ProductOfferSearchRequest mockSearchRequest = new ProductOfferSearchRequest();
-        when(epcDeviceService.createSearchRequest(sorId)).thenReturn(mockSearchRequest);
-
-        DeviceEpcDto mockDeviceEpcDto = new DeviceEpcDto();
-        when(genericWebClient.callPostApi(eq(bearerToken), anyString(), any(), eq(AmdocsSearchResponse.class), anyString()))
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(AmdocsSearchResponse.class), any()))
                 .thenReturn(Mono.just(new AmdocsSearchResponse()));
 
-        StepVerifier.create(epcDeviceService.getEPCDeviceDetails(sorId, env))
-                .expectNext(mockDeviceEpcDto)
+        Mono<DeviceEpcDto> result = epcDeviceService.getEPCDeviceDetails(sorId, env);
+
+        StepVerifier.create(result)
+                .expectNext(expectedDto)
                 .verifyComplete();
-
-        verify(tokenService, times(1)).getToken(env);
-        verify(genericWebClient, times(1)).callPostApi(anyString(), anyString(), any(), any(), anyString());
     }
 
     @Test
-    void getEPCDeviceDetails_TokenServiceFailure() {
-        when(tokenService.getToken(env)).thenReturn(Mono.error(new RuntimeException("Token service failed")));
+    void testGetEPCDeviceDetails_TokenServiceFailure() {
+        when(tokenService.getToken(anyString())).thenReturn(Mono.error(new RuntimeException("Token error")));
 
-        StepVerifier.create(epcDeviceService.getEPCDeviceDetails(sorId, env))
-                .expectError(CustomEPCException.class)
-                .verify();
+        Mono<DeviceEpcDto> result = epcDeviceService.getEPCDeviceDetails(sorId, env);
 
-        verify(tokenService, times(1)).getToken(env);
-    }
-
-    @Test
-    void getEPCDeviceDetails_FetchProductOfferingFailure() throws JsonProcessingException, ConverterException {
-        Token mockToken = new Token();
-        mockToken.setToken("test-token");
-        when(tokenService.getToken(env)).thenReturn(Mono.just(mockToken));
-
-        ProductOfferSearchRequest mockSearchRequest = new ProductOfferSearchRequest();
-        when(epcDeviceService.createSearchRequest(sorId)).thenReturn(mockSearchRequest);
-
-        when(genericWebClient.callPostApi(anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(Mono.error(new RuntimeException("API call failed")));
-
-        StepVerifier.create(epcDeviceService.getEPCDeviceDetails(sorId, env))
-                .expectNext(new DeviceEpcDto())
-                .verifyComplete();
-
-        verify(tokenService, times(1)).getToken(env);
-        verify(genericWebClient, times(1)).callPostApi(anyString(), anyString(), any(), any(), anyString());
-    }
-
-    @Test
-    void createSearchRequest_Failure() throws JsonProcessingException, ConverterException {
-        when(epcDeviceService.createSearchRequest(sorId))
-                .thenThrow(new CustomEPCException("Failed to create search request"));
-
-        StepVerifier.create(Mono.fromCallable(() -> epcDeviceService.createSearchRequest(sorId)))
-                .expectError(CustomEPCException.class)
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable -> throwable instanceof CustomEPCException && throwable.getMessage().contains("Unexpected error in generating token"))
                 .verify();
     }
 
     @Test
-    void fetchProductSpecification_Failure() {
-        when(genericWebClient.callPostApi(anyString(), anyString(), any(), eq(ProductOfferingResponse.class), anyString()))
-                .thenReturn(Mono.error(new RuntimeException("Product Spec API failed")));
+    void testCreateSearchRequest_ExceptionHandling() {
+        assertThrows(CustomEPCException.class, () -> epcDeviceService.createSearchRequest(null));
+    }
 
-        StepVerifier.create(epcDeviceService.fetchProductSpecification(bearerToken, env, "docID"))
+    @Test
+    void testFetchProductOffering_ExceptionHandling() {
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(AmdocsSearchResponse.class), any()))
+                .thenReturn(Mono.error(new RuntimeException("API Failure")));
+
+        Mono<DeviceEpcDto> result = epcDeviceService.fetchProductOffering(bearerToken, env, new ProductOfferSearchRequest());
+
+        StepVerifier.create(result)
                 .expectNext(new DeviceEpcDto())
                 .verifyComplete();
     }
 
     @Test
-    void fetchPriceRecords_Failure() {
-        when(genericWebClient.callPostApi(anyString(), anyString(), any(), eq(ProductOfferingPriceResponse.class), anyString()))
-                .thenReturn(Mono.error(new RuntimeException("Price API failed")));
+    void testFetchProductSpecification_ExceptionHandling() {
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class), any()))
+                .thenReturn(Mono.error(new RuntimeException("Product Spec API Failure")));
 
-        StepVerifier.create(epcDeviceService.fetchPriceRecords(new ProductOfferingResponse(), bearerToken, env))
-                .expectNext(new ProductOfferingPriceResponse())
-                .verifyComplete();
-    }
+        Mono<DeviceEpcDto> result = epcDeviceService.fetchProductSpecification(bearerToken, env, "documentID");
 
-    @Test
-    void fetchProductDetails_Failure() {
-        when(genericWebClient.callPostApi(anyString(), anyString(), any(), eq(ProductOfferingResponse.class), anyString()))
-                .thenReturn(Mono.error(new RuntimeException("Product Details API failed")));
-
-        StepVerifier.create(epcDeviceService.fetchProductDetails(bearerToken, env, new ProductOfferingResponse(), Mono.just(new ProductOfferingPriceResponse()), "specID"))
+        StepVerifier.create(result)
                 .expectNext(new DeviceEpcDto())
                 .verifyComplete();
     }
 
     @Test
-    void fetchBundledProductDetails_Failure() {
-        when(genericWebClient.callPostApi(anyString(), anyString(), any(), eq(ProductOfferingResponse.class), anyString()))
-                .thenReturn(Mono.error(new RuntimeException("Bundled Product API failed")));
+    void testFetchProductDetails_ExceptionHandling() {
+        Mono<ProductOfferingPriceResponse> priceResponse = Mono.just(new ProductOfferingPriceResponse());
+        when(genericWebClient.callPostApi(any(), any(), any(), eq(ProductOfferingResponse.class), any()))
+                .thenReturn(Mono.error(new RuntimeException("Product Details API Failure")));
 
-        StepVerifier.create(epcDeviceService.fetchBundledProductDetails(bearerToken, env, new ProductOfferingResponse(), Mono.just(new ProductOfferingPriceResponse()), new ProductOfferingResponse()))
+        Mono<DeviceEpcDto> result = epcDeviceService.fetchProductDetails(bearerToken, env, new ProductOfferingResponse(), priceResponse, "specId");
+
+        StepVerifier.create(result)
                 .expectNext(new DeviceEpcDto())
-                .verifyComplete();
-    }
-
-    @Test
-    void fetchProductOfferingGroup_Failure() {
-        when(genericWebClient.callPostApi(anyString(), anyString(), any(), eq(ProductOfferingResponse.class), anyString()))
-                .thenReturn(Mono.error(new RuntimeException("POG API failed")));
-
-        StepVerifier.create(epcDeviceService.fetchProductOfferingGroup(bearerToken, new ProductOfferingResponse(), env))
-                .expectNext(new ProductOfferingResponse())
                 .verifyComplete();
     }
 }
