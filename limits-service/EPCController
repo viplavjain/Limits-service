@@ -1,0 +1,11 @@
+public  Mono<ResponseEntity<DeviceEpcDto>> getEPC(@PathVariable String productType,
+                                                      @PathVariable String env,
+                                                      @RequestParam(value = "sorId", required = true) String sorId) throws JsonProcessingException, ConverterException {
+        Mono<DeviceEpcDto> authoringData = epcService.getEPCDeviceDetails(sorId, env,productType);
+        return authoringData.flatMap(res ->
+                Mono.just(ResponseEntity
+                        .ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(res))
+        ).onErrorMap(err -> errorBuilder.buildApplicationException(err));
+    }
