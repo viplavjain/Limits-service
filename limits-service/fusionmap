@@ -1,0 +1,22 @@
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.*;
+
+public class JsonNodeToMapConverter {
+    public static List<Map<String, String>> convertJsonNodeToListOfMaps(JsonNode jsonNode) {
+        List<Map<String, String>> resultList = new ArrayList<>();
+
+        // Navigate to docs array
+        JsonNode docsArray = jsonNode.path("response").path("docs");
+        if (docsArray.isArray()) {
+            for (JsonNode docNode : docsArray) {
+                Map<String, String> resultMap = new HashMap<>();
+                docNode.fields().forEachRemaining(entry -> 
+                    resultMap.put(entry.getKey(), entry.getValue().asText())
+                );
+                resultList.add(resultMap);
+            }
+        }
+
+        return resultList;
+    }
+}
