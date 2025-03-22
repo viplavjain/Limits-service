@@ -20,3 +20,36 @@ public class JsonNodeToMapConverter {
         return resultList;
     }
 }
+----------------------------------
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.*;
+
+public class JsonNodeToMapConverter {
+    public static List<Map<String, String>> convertJsonNodeToListOfMaps(JsonNode jsonNode) {
+        List<Map<String, String>> resultList = new ArrayList<>();
+
+        // Navigate to docs array
+        JsonNode docsArray = jsonNode.path("response").path("docs");
+        if (docsArray.isArray()) {
+            for (JsonNode docNode : docsArray) {
+                Map<String, String> resultMap = new HashMap<>();
+                docNode.fields().forEachRemaining(entry -> {
+                    JsonNode valueNode = entry.getValue();
+                    
+                    // Check if the field is an array
+                    if (valueNode.isArray()) {
+                        List<String> values = new ArrayList<>();
+                        valueNode.forEach(item -> values.add(item.asText()));
+                        resultMap.put(entry.getKey(), String.join(", ", values)); // Convert array to comma-separated string
+                    } else {
+                        resultMap.put(entry.getKey(), valueNode.asText());
+                    }
+                });
+                resultList.add(resultMap);
+            }
+        }
+
+        return resultList;
+    }
+}
+
