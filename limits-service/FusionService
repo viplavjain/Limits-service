@@ -137,3 +137,128 @@ public class FusionService {
 
     }
 }
+-------------------------------------------------------------------------------
+package com.vzw.tools.consumer.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vzw.tools.consumer.configuration.FusionConfiguration;
+import com.vzw.tools.source.configuration.RunTimeMapInitializer;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
+
+import java.nio.charset.StandardCharsets;
+
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class FusionServiceTest {
+
+    @Mock
+    private FusionConfiguration fusionConfiguration;
+
+    @Mock
+    private RunTimeMapInitializer runTimeMapInitializer;
+
+    @Mock
+    private WebClient.Builder webClientBuilder;
+
+    @Mock
+    private WebClient webClient;
+
+    @Mock
+    private WebClient.RequestHeadersUriSpec requestHeadersUriSpec;
+
+    @Mock
+    private WebClient.RequestHeadersSpec requestHeadersSpec;
+
+    @Mock
+    private WebClient.ResponseSpec responseSpec;
+
+    @InjectMocks
+    private FusionService fusionService;
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String SAMPLE_JSON_RESPONSE = "{ \"response\": { \"docs\": [{\"sku_id_s\": \"sku6004671\", \"brand\": \"Apple\"}] } }";
+
+    private JsonNode jsonResponse;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        jsonResponse = objectMapper.readTree(SAMPLE_JSON_RESPONSE);
+        
+        // Mock Fusion Configuration
+        when(fusionConfiguration.getHost(anyString())).thenReturn("https://mocked-url.com");
+        when(fusionConfiguration.getSearch_By_SOR_API_URL()).thenReturn("/fusion/search");
+        when(fusionConfiguration.getUsername(anyString())).thenReturn("user");
+        when(fusionConfiguration.getPassword(anyString())).thenReturn("password");
+
+        // Mock WebClient
+        when(webClientBuilder.build()).thenReturn(webClient);
+        when(webClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(anyString())).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.headers(any())).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+    }
+
+    /**
+     * Test: Successful API call
+     */
+    @Test
+    void getFusionServiceDetails_Success() {
+        // Mock successful API response
+        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(jsonResponse));
+
+        Mono<JsonNode> result = fusionService.getFusionServiceDetails("12345", "Mobile", "QA");
+
+        StepVerifier.create(result)
+                .expectNext(jsonResponse)
+                .verifyComplete();
+
+        verify(webClient, times(1)).get();
+    }
+
+    /**
+     * Test: WebClientResponseException Handling
+     */
+    @Test
+    void getFusionServiceDetails_WebClientException() {
+        WebClientResponseException webClientException = WebClientResponseException.create(
+                500, "Internal Server Error", null, "Error".getBytes(StandardCharsets.UTF_8), null
+        );
+
+        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.error(webClientException));
+
+        Mono<JsonNode> result = fusionService.getFusionServiceDetails("12345", "Mobile", "QA");
+
+        StepVerifier.create(result)
+                .verifyComplete(); // Should return default response (empty Mono)
+
+        verify(webClient, times(1)).get();
+    }
+
+    /**
+     * Test: Unexpected Exception Handling
+     */
+    @Test
+    void getFusionServiceDetails_UnexpectedException() {
+        when(responseSpec.bodyToMono(JsonNode.class)).thenThrow(new RuntimeException("Unexpected Error"));
+
+        Mono<JsonNode> result = fusionService.getFusionServiceDetails("12345", "Mobile", "QA");
+
+        StepVerifier.create(result)
+                .verifyComplete(); // Should return default response (empty Mono)
+
+        verify(webClient, times(1)).get();
+    }
+}
+
