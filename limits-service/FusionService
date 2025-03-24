@@ -1,0 +1,139 @@
+package com.vzw.tools.consumer.service;
+
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vzw.tools.common.constant.CommonConstants;
+import com.vzw.tools.common.util.CommonUtil;
+import com.vzw.tools.consumer.configuration.FusionConfiguration;
+import com.vzw.tools.consumer.entity.FusionResponse;
+import com.vzw.tools.source.configuration.RunTimeMapInitializer;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@Service
+public class FusionService {
+    private FusionConfiguration fusionConfiguration;
+    private final RunTimeMapInitializer runTimeMapInitializer;
+    private final WebClient webClient = WebClient.builder().build();
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+
+    @Autowired
+    FusionService(FusionConfiguration fusionConfiguration, RunTimeMapInitializer runTimeMapInitializer) {
+        this.fusionConfiguration = fusionConfiguration;
+        this.runTimeMapInitializer = runTimeMapInitializer;
+    }
+
+    public Mono<JsonNode> getFusionServiceDetails(String sorID, String productType, String env) {
+        //fusionServiceConfig.setupFusionEnvironment("qa1");
+        log.info("Fetching fusion service details for sorId: {} in environment : {}", sorID, env);
+        String url = fusionConfiguration.getHost(env) + fusionConfiguration.getSearch_By_SOR_API_URL() + CommonConstants.COLON + sorID;
+        return webClient.get()
+                .uri(url)
+                .headers(headers -> headers.setBasicAuth(fusionConfiguration.getUsername(env), fusionConfiguration.getPassword(env)))
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .flatMap(response -> handleLoggingAndError(Mono.just(response), url, response, "fusion"));
+    }
+
+    /**
+     * Reusable method for logging success and handling errors.
+     */
+    private Mono<JsonNode> handleLoggingAndError(Mono<JsonNode> mono, String apiPath, JsonNode responseType, String typeOfCall) {
+        return mono.doOnSuccess(response -> logResponse(apiPath, response, typeOfCall))
+                .doOnError(error -> log.error("Error occurred while calling {} API: {}", typeOfCall, apiPath, error))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    log.error("{} API call failed with status: {}, body: {}", typeOfCall, ex.getStatusCode(), ex.getResponseBodyAsString());
+                    return getDefaultResponse(responseType);
+                })
+                .onErrorResume(Exception.class, ex -> {
+                    log.error("Unexpected error occurred while calling {} API: {}", typeOfCall, apiPath, ex);
+                    return getDefaultResponse(responseType);
+                });
+    }
+
+    /**
+     * Logs API response in JSON format.
+     */
+    private <R> void logResponse(String apiPath, R response, String typeOfCall) {
+        try {
+            log.info("Received response from {} API: {}, Response: {}", typeOfCall, apiPath, objectMapper.writeValueAsString(response));
+        } catch (Exception e) {
+            log.error("Error while logging response for API: {}", apiPath, e);
+        }
+    }
+
+    /**
+     * Returns a default instance of responseType if an error occurs.
+     */
+    private Mono<JsonNode> getDefaultResponse(JsonNode responseType) {
+        try {
+
+            //log.info("Returning default instance of response type: {}", responseType.getSimpleName());
+            return Mono.just(responseType);
+        } catch (Exception e) {
+            log.error("Failed to create a default instance of response type: {}", responseType, e);
+            return Mono.empty();
+        }
+    }
+
+    public Mono<Map<String, String>> getFusionMappedJson1(String sorId, String sys, String productType) {
+        return getFusionServiceDetails(sorId, sys, productType)
+                .flatMap(fusionDeviceDetails -> getFusionMappedJson(fusionDeviceDetails))
+                .onErrorResume(Exception.class, ex -> {
+                    log.error("Unexpected error occurred while calling fusion api");
+                    return Mono.just(new HashMap<>());
+                });
+
+    }
+
+    public Mono<Map<String, String>> getFusionMappedJson(JsonNode fusionResponse) {
+        Map<String, String> fusionMapJson = new HashMap<>();
+        try {
+                    Map<String, String> fusionMapWithApiValues = convertFusionResponseToMap(fusionResponse);
+                    Map<String, String> cacheMap = runTimeMapInitializer.getFusionMap();
+                    for (Map.Entry<String, String> e : cacheMap.entrySet()) {
+                        String value = fusionMapWithApiValues.get(e.getValue());
+                        fusionMapJson.putIfAbsent(e.getKey(), value);
+                    }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return Mono.just(fusionMapJson);
+    }
+
+    public Map<String, String> convertFusionResponseToMap(JsonNode fusionResponse) {
+        JsonNode docsArray = fusionResponse.path("response").path("docs");
+        Map<String, String> resultMap = new HashMap<>();
+        if (docsArray.isArray()) {
+            for (JsonNode docNode : docsArray) {
+                docNode.fields().forEachRemaining(entry -> {
+                    JsonNode valueNode = entry.getValue();
+
+                    // Check if the field is an array
+                    if (valueNode.isArray()) {
+                        List<String> values = new ArrayList<>();
+                        valueNode.forEach(item -> values.add(item.asText()));
+                        resultMap.put(entry.getKey(), String.join(", ", values)); // Convert array to comma-separated string
+                    } else {
+                        resultMap.put(entry.getKey(), valueNode.asText());
+                    }
+                });
+            }
+        }
+        return resultMap;
+
+    }
+}
