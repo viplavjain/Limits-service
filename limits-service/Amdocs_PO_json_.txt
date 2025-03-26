@@ -1346,3 +1346,82 @@
         "total": 0
     }
 }
+---------------------------------------------------------------------------
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class JsonNodeToMapConverter {
+
+    public static Map<String, String> convertProductOffering(JsonNode productOfferingNode) {
+        Map<String, String> resultMap = new HashMap<>();
+
+        // Check if the input node is an array
+        if (productOfferingNode.isArray()) {
+            for (JsonNode characteristic : productOfferingNode) {
+                // Extract the "name" field
+                String name = characteristic.path("name").asText();
+
+                // Extract the first "localizedValue.value" inside "productOfferingCharacteristicValue"
+                JsonNode characteristicValueArray = characteristic.path("productOfferingCharacteristicValue");
+
+                if (characteristicValueArray.isArray() && characteristicValueArray.size() > 0) {
+                    JsonNode firstValueNode = characteristicValueArray.get(0).path("localizedValue");
+
+                    if (firstValueNode.isArray() && firstValueNode.size() > 0) {
+                        String value = firstValueNode.get(0).path("value").asText();
+                        resultMap.put(name, value);
+                    }
+                }
+            }
+        }
+        return resultMap;
+    }
+------------------------------------------------------------------------
+    import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class JsonNodeToMapConverter {
+
+    public static Map<String, String> convertProductOffering(JsonNode productOfferingNode) {
+        Map<String, String> resultMap = new HashMap<>();
+
+        // Check if the input node is an array
+        if (productOfferingNode.isArray()) {
+            for (JsonNode characteristic : productOfferingNode) {
+                // Extract the "name" field
+                String name = characteristic.path("name").asText();
+
+                // Extract the first "localizedValue.value" inside "productOfferingCharacteristicValue"
+                JsonNode characteristicValueArray = characteristic.path("productOfferingCharacteristicValue");
+
+                if (characteristicValueArray.isArray() && characteristicValueArray.size() > 0) {
+                    JsonNode firstValueNode = characteristicValueArray.get(0).path("localizedValue");
+
+                    if (firstValueNode.isArray() && firstValueNode.size() > 0) {
+                        String value = firstValueNode.get(0).path("value").asText();
+                        resultMap.put(name, value);
+                    }
+                }
+            }
+        }
+        return resultMap;
+    }
+
+    public static void main(String[] args) throws Exception {
+        String json = "{ \"productOfferingCharacteristic\": [ { \"name\": \"activeFlag\", \"productOfferingCharacteristicValue\": [ { \"localizedValue\": [ { \"value\": \"Yes\" } ] } ] }, { \"name\": \"showcaseFlag\", \"productOfferingCharacteristicValue\": [ { \"localizedValue\": [ { \"value\": \"Yes\" } ] } ] }, { \"name\": \"supportOnlyFlag\", \"productOfferingCharacteristicValue\": [ { \"localizedValue\": [ { \"value\": \"No\" } ] } ] } ] }";
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode rootNode = objectMapper.readTree(json);
+        JsonNode productOfferingNode = rootNode.path("productOfferingCharacteristic");
+
+        Map<String, String> result = convertProductOffering(productOfferingNode);
+        System.out.println(result); // Output: {activeFlag=Yes, showcaseFlag=Yes, supportOnlyFlag=No}
+    }
+}
+
