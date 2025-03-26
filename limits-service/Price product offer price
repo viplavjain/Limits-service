@@ -37,6 +37,74 @@ private HashMap<String,String> retreivePopMap(ProductOfferingPriceResponse produ
         }
         return priceRecordValue;
     }
+--------------------------------------------------------------------------------------------------------------
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.HashMap;
+import java.util.Iterator;
+
+public class PriceRecordProcessor {
+
+    public HashMap<String, String> retrievePopMap(JsonNode productOfferingPriceResponse) {
+        HashMap<String, String> hashMap = new HashMap<>();
+        JsonNode priceRecords = productOfferingPriceResponse.get("priceRecords");
+
+        if (priceRecords != null && priceRecords.isArray()) {
+            for (JsonNode record : priceRecords) {
+                String key = retrieveKey(record);
+                String value = retrieveValue(record);
+                if (key != null && value != null) {
+                    hashMap.put(key, value);
+                }
+            }
+        }
+        return hashMap;
+    }
+
+    private String retrieveKey(JsonNode priceRecord) {
+        JsonNode parameters = priceRecord.get("parameter");
+        String commitmentName = null;
+        String priceType = null;
+
+        if (parameters != null && parameters.isArray()) {
+            for (JsonNode parameter : parameters) {
+                String paramName = parameter.get("name").asText();
+                JsonNode paramValueNode = parameter.get("value");
+
+                if (paramValueNode != null) {
+                    String paramValue = paramValueNode.get("name").asText();
+
+                    if ("Commitment".equalsIgnoreCase(paramName)) {
+                        commitmentName = paramValue;
+                    }
+                    if ("vz_price_type".equalsIgnoreCase(paramName)) {
+                        priceType = paramValue;
+                    }
+                }
+            }
+        }
+
+        if (priceType != null && "CP".equalsIgnoreCase(priceType)) {
+            return priceType + commitmentName;
+        } else {
+            return priceType;
+        }
+    }
+
+    private String retrieveValue(JsonNode priceRecord) {
+        JsonNode prices = priceRecord.get("price");
+        if (prices != null && prices.isArray()) {
+            for (JsonNode price : prices) {
+                JsonNode dutyFreeAmount = price.get("dutyFreeAmount");
+                if (dutyFreeAmount != null) {
+                    String priceRecordValue = dutyFreeAmount.get("value").asText();
+                    return priceRecordValue.contains(".") ? priceRecordValue.replaceFirst("\\.0*$", "") : priceRecordValue;
+                }
+            }
+        }
+        return null;
+    }
+}
+
 -----------------------------------------------------------------------------------------------------
 {
     "productOffer": {
