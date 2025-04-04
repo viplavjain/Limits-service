@@ -1,0 +1,298 @@
+package com.vzw.tools.persistence.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vzw.tools.authoring.entity.ProductOfferingPriceResponse;
+import com.vzw.tools.common.constant.AmdocsConstants;
+import com.vzw.tools.common.constant.CommonConstants;
+import com.vzw.tools.common.exception.ErrorBuilder;
+import com.vzw.tools.common.util.CommonUtil;
+import com.vzw.tools.persistence.configuration.CassandraConfiguration;
+import com.vzw.tools.persistence.dto.CassandraDto;
+import com.vzw.tools.persistence.dto.Parameter;
+import com.vzw.tools.persistence.dto.ProductOfferingGroupDto;
+import com.vzw.tools.persistence.dto.ProductUniversalAccessoriesDTO;
+import com.vzw.tools.source.configuration.RunTimeMapInitializer;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+
+import java.util.*;
+
+import static com.vzw.tools.common.util.CommonUtil.removeTrailingComma;
+import static com.vzw.tools.persistence.constant.CassandraConstants.*;
+
+@Service
+@Slf4j
+public class CassandraService {
+
+    private final RunTimeMapInitializer runTimeMapInitializer;
+    private final WebClient webClient = WebClient.builder().build();
+    private final CassandraConfiguration cassandraConfiguration;
+    private final List<String> fields = Arrays.asList(CommonConstants.CARRIER, CommonConstants.MANUFACTURER);
+
+    ErrorBuilder errorBuilder;
+
+    @Autowired
+    public CassandraService(CassandraConfiguration cassandraConfiguration, RunTimeMapInitializer runTimeMapInitializer, ErrorBuilder errorBuilder) {
+        this.cassandraConfiguration = cassandraConfiguration;
+        this.runTimeMapInitializer = runTimeMapInitializer;
+        this.errorBuilder = errorBuilder;
+    }
+
+    public Mono<Object> getDeviceDetailsUpdated(String sorID, String productType, String env) {
+        return getDeviceDetails(sorID, productType, env).flatMap(response -> {
+            ObjectMapper mapper = new ObjectMapper();
+            try {
+                ProductOfferingGroupDto productOfferingGroupDto = mapper.convertValue(response, ProductOfferingGroupDto.class);
+                String productOfferingGroupId = productOfferingGroupDto.getData().get(0).getProductOfferingGroup().get(0).getId();
+                String responsePo = getProductOfferingGroupId(productOfferingGroupId, productType, env);
+                ProductUniversalAccessoriesDTO productDto = mapper.readValue(responsePo, ProductUniversalAccessoriesDTO.class);
+                String productUniversalAccessories = null;
+
+                for (ProductUniversalAccessoriesDTO.Policy p : productDto.getData().getPolicy()) {
+                    for (ProductUniversalAccessoriesDTO.Characteristic characteristic : p.getCharacteristic()) {
+                        if (characteristic.getName().equalsIgnoreCase(CommonConstants.PRODUCT_UNIVERSAL_ACCESSORIES)) {
+                            productUniversalAccessories = mapper.writeValueAsString(characteristic);
+                            break;
+                        }
+                    }
+                    if (productUniversalAccessories != null) {
+                        break;
+                    }
+                }
+                String responseJson = mapper.writeValueAsString(response);
+
+                int index = responseJson.indexOf(productOfferingGroupId);
+                if (index != -1) {
+                    productUniversalAccessories = ",\"productUniversalAccessories\":" + productUniversalAccessories;
+                    responseJson = responseJson.substring(0, index + productOfferingGroupId.length() + 1) + productUniversalAccessories + responseJson.substring(index + productOfferingGroupId.length() + 1);
+                }
+                return Mono.just(responseJson);
+            } catch (Exception e) {
+                log.error("Error occurred while mapping response to CassandraDto: {}", e.getMessage(), e);
+            }
+            return null;
+        });
+    }
+
+    public Mono<Object> getPromotionDetails(String sorID, String productType, String env){
+        try {
+            return getDeviceDetails(sorID, productType, env).flatMap(response -> {
+                return Mono.just(response);
+            });
+        } catch(Exception e){
+            log.error("Error occurred while mapping response to CassandraDto: {}", e.getMessage(), e);
+            return Mono.error(errorBuilder.buildApplicationException(e));
+        }
+    }
+    public String getUrl(String sorID, String productType, String env) {
+        if(productType.equalsIgnoreCase(CommonConstants.PROD_TYPE_DEVICE)) {
+            return cassandraConfiguration.getHost(env) + PRODUCT_OFFERING_URL + "externalId=" + sorID + "&depth=2";
+        } else if(productType.equalsIgnoreCase(CommonConstants.PROD_TYPE_PROMOTION)) {
+            return cassandraConfiguration.getHost(env) + PRODUCT_PROMOTION_URL + "externalId=" + sorID;
+        }
+        return null;
+    }
+
+
+
+    public Mono<Object> getDeviceDetails(String sorID, String productType, String env) {
+        log.info("Fetching device details for sorId: {} in environment : {}", sorID, env);
+        HttpHeaders headers = cassandraConfiguration.getHttpHeaders(productType);
+        String url = getUrl(sorID, productType, env);
+        log.debug("Constructed URL in device flow: {}", url);
+        return this.webClient.get()
+                .uri(url)
+                .headers(header -> header.addAll(headers))
+                .retrieve()
+                .bodyToMono(Object.class)
+                .doOnSubscribe(subscription -> log.debug("Request initiated for URL in device flow: {}", url))
+                .doOnNext(response -> log.debug("Received response in device flow: {}", response))
+                .doOnError(error -> log.error("Error occurred while fetching device details: {}", error.getMessage(), error));
+    }
+
+    public String getProductOfferingGroupId(String sorID, String productType, String env) {
+        log.info("Fetching productOfferingGroupId details for sorId: {} in environment : {}", sorID, env);
+        HttpHeaders headers = cassandraConfiguration.getHttpHeaders(productType);
+        String url = cassandraConfiguration.getHost(env) + PRODUCT_OFFERING_GROUP_URL + sorID;
+        log.debug("Constructed URL in productOfferingGroupId flow: {}", url);
+        RestTemplate template = new RestTemplate();
+        headers.add("CLIENT_ID", "epc-internal");
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        ResponseEntity<String> response = template.exchange(url, HttpMethod.GET, entity, String.class);
+        return response.getBody();
+    }
+
+    private HashMap<String, String> getPersistenceMapFromCassandraMap(Map<String, String> cassandraMap , String productType) {
+        HashMap<String, String> persistenceMapJson = new HashMap<>();
+        HashMap<String, String> persistMap = runTimeMapInitializer.getPersistentMap(productType);
+        for (Map.Entry<String, String> e : persistMap.entrySet()) {
+            String value = cassandraMap.get(e.getValue());
+            persistenceMapJson.put(e.getKey(), value);
+        }
+        return persistenceMapJson;
+    }
+
+    public Mono<Map<String, String>> getCassandraMap(String sorID, String productType, String env) {
+        return getCassandraDto(sorID, productType, env).flatMap(cassandraDto -> {
+            Map<String, String> cassandraMap = new HashMap<>();
+            if(cassandraDto != null && !CollectionUtils.isEmpty(cassandraDto.getData())){
+                if(!CollectionUtils.isEmpty(cassandraDto.getData().get(0).getProductOfferingGroup())){
+                    //retrieve universal property code list: Universal BT,Universal BTS,Universal Other
+                    setUniversalPropCode(cassandraMap, cassandraDto.getData().get(0).getProductOfferingGroup());
+                }
+                //retrieve sor id from json
+                if(!CollectionUtils.isEmpty(cassandraDto.getData().get(0).getExternalId())) {
+                    cassandraDto.getData().get(0).getExternalId().forEach(ex -> {
+                        if ("SOR".equalsIgnoreCase(ex.getOwner())) {
+                            cassandraMap.put("SOR", ex.getId());
+                        }
+                    });
+                }
+                //set ProductSpecification(ProductSpecCharacteristic and BundledProductSpecification) values in map
+                if(null != cassandraDto.getData().get(0).getProductSpecification()){
+
+                    //set ProductSpecCharacteristic values in map
+                    if(!CollectionUtils.isEmpty(cassandraDto.getData().get(0).getProductSpecification().getProductSpecCharacteristic())) {
+                        List<CassandraDto.ProductSpecCharacteristic> productSpecCharacteristics = cassandraDto.getData().get(0).getProductSpecification().getProductSpecCharacteristic();
+                        setProdSpecCharacteristicValues(productSpecCharacteristics, cassandraMap);
+                    }
+
+                    //set BundledProductSpecification values in map
+                    if(null != cassandraDto.getData().get(0).getProductSpecification().getBundledProductSpecification()) {
+                        List<CassandraDto.ProductSpecCharacteristic> productSpecCharacteristicsFromBundledProdSpec = cassandraDto.getData().get(0).getProductSpecification().getBundledProductSpecification().getProductSpecCharacteristic();
+                        setProdSpecCharacteristicValues(productSpecCharacteristicsFromBundledProdSpec, cassandraMap);
+                    }
+                }
+                //set price values, FRP, One yr proce, two yr price etc from ProductOfferingPrice in to the map
+                if(!CollectionUtils.isEmpty(cassandraDto.getData().get(0).getProductOfferingPrice())){
+                    List<CassandraDto.PriceRecord> priceRecords = cassandraDto.getData().get(0).getProductOfferingPrice().get(0).getPriceRecord();
+                    Map<String,String> priceMap = new HashMap<>();
+                    if(priceRecords!=null) {
+                        for (CassandraDto.PriceRecord priceRecord : priceRecords) {
+                            String key = retrieveKey(priceRecord);
+                            String value = retrieveValue(priceRecord);
+                            priceMap.put(key, value);
+                        }
+                    }
+                    cassandraMap.putAll(priceMap);
+                }
+            }
+            //process the map and add the values against generic key for comparison
+            return Mono.just(getPersistenceMapFromCassandraMap(cassandraMap, productType));
+
+        });
+
+    }
+
+    private Mono<CassandraDto> getCassandraDto(String sorID, String productType, String env) {
+        try {
+            return getDeviceDetailsUpdated(sorID, productType, env).flatMap(res -> {
+                ObjectMapper mapper = new ObjectMapper();
+                try {
+                    return Mono.just(mapper.readValue(String.valueOf(res), CassandraDto.class));
+                } catch (JsonProcessingException e) {
+                    log.error("Error occurred while mapping response to CassandraDto: {}", e.getMessage(), e);
+                    return Mono.error(errorBuilder.buildApplicationException(e));
+                }
+
+            });
+        }
+        catch (Exception e) {
+            log.error("Error occurred while mapping response to CassandraDto: {}", e.getMessage(), e);
+            return Mono.error(errorBuilder.buildApplicationException(e));
+        }
+
+    }
+    private static void setProdSpecCharacteristicValues(List<CassandraDto.ProductSpecCharacteristic> productSpecCharacteristics, Map<String, String> cassandraMap) {
+        productSpecCharacteristics.forEach(productSpecCharacteristic -> {
+            String productOfferingName = productSpecCharacteristic.getName();
+            List<CassandraDto.ProductSpecCharacteristicValue> productSpecCharacteristicValues = productSpecCharacteristic.getProductSpecCharacteristicValue();
+            if(!CollectionUtils.isEmpty(productSpecCharacteristicValues)){
+                if(!CollectionUtils.isEmpty(productSpecCharacteristicValues.get(0).getField())){
+                    productSpecCharacteristic.getProductSpecCharacteristicValue().get(0).getField().forEach(field -> {
+                        StringBuilder sb = new StringBuilder();
+                        sb.append(productOfferingName).append(".").append(field.getName());
+                        String prodOfferingKeywithBaseName = sb.toString();
+                        if(!CollectionUtils.isEmpty(field.getEntry()) && !CollectionUtils.isEmpty(field.getEntry().get(0).getParameter())){
+                            String prodOfferingValTemp = field.getEntry().get(0).getParameter().get(0).getValue().toString();
+                            String prodOfferingVal = CommonUtil.removeLeadingAndTrailingBrackets(prodOfferingValTemp);
+                            cassandraMap.put(prodOfferingKeywithBaseName, prodOfferingVal);
+                        }
+
+                    });
+                }
+                else {
+                    cassandraMap.put(productOfferingName, productSpecCharacteristicValues.get(0).getValue());
+                }
+            }
+        });
+    }
+
+    //retrieve the price keys: FRP, CP-12, CP - 24 from the price node
+    private String retrieveKey(CassandraDto.PriceRecord priceRecord){
+        List<Parameter> parameters = priceRecord.getParameter();
+        String commitmentName = null;
+        String priceType = null;
+        for (Parameter parameter : parameters){
+            if(parameter.getName().equalsIgnoreCase(AmdocsConstants.COMMITMENT)){
+                commitmentName = parameter.getValue();
+            }
+            if(parameter.getName().equalsIgnoreCase(AmdocsConstants.VZ_PRICE_TYPE)){
+                priceType = parameter.getValue();
+            }
+        }
+        if(priceType!=null && priceType.equalsIgnoreCase(AmdocsConstants.CP))
+            return priceType +" - "+ commitmentName;
+        else
+            return priceType;
+    }
+
+    //retrieve the price values for  FRP, CP-12, CP - 24 from the price node
+    private String retrieveValue(CassandraDto.PriceRecord priceRecord){
+        List<ProductOfferingPriceResponse.Price> prices = priceRecord.getPrice();
+        String priceRecordValue= null;
+        for(ProductOfferingPriceResponse.Price price : prices){
+            priceRecordValue= price.getDutyFreeAmount().getValue();
+            priceRecordValue = priceRecordValue.contains(CommonConstants.STRING_DOT) ? priceRecordValue.replaceFirst(AmdocsConstants.PRICE_CODE_REGEX,CommonConstants.EMPTY_STRING):priceRecordValue;
+        }
+        return priceRecordValue;
+    }
+
+    //set productUniversalAccessories
+    private void setUniversalPropCode(Map<String, String> cassandraMap, List<CassandraDto.ProductOfferingGroup> productOfferingGroups){
+        if(null != productOfferingGroups.get(0).getProductUniversalAccessories()){
+            List<CassandraDto.ProductSpecCharacteristicValue> characteristicValues = productOfferingGroups.get(0).getProductUniversalAccessories().getCharacteristicValue();
+            if(!CollectionUtils.isEmpty(characteristicValues)){
+                StringBuilder sb = new StringBuilder();
+                characteristicValues.stream().forEach(characteristicValue -> {
+                    List<CassandraDto.Field> fields = characteristicValue.getField();
+                    if(!CollectionUtils.isEmpty(fields)){
+                        Optional<CassandraDto.Field> univPropCDFieldOpt = fields.stream().filter(field -> "univPropCD".equalsIgnoreCase(field.getName())).findFirst();
+                        if(univPropCDFieldOpt.isPresent() && !CollectionUtils.isEmpty(univPropCDFieldOpt.get().getEntry()) && !CollectionUtils.isEmpty(univPropCDFieldOpt.get().getEntry().get(0).getParameter())
+                                && !CollectionUtils.isEmpty(univPropCDFieldOpt.get().getEntry().get(0).getParameter().get(0).getValue())){
+                            String univPropCDFieldArrayStr = univPropCDFieldOpt.get().getEntry().get(0).getParameter().get(0).getValue().toString();
+                            String univPropCDFieldTemp = CommonUtil.removeLeadingAndTrailingBrackets(univPropCDFieldArrayStr);
+                            sb.append(univPropCDFieldTemp).append(",");
+
+                        }
+                    }
+                });
+                String productUniversalAccessories = removeTrailingComma(sb.toString());
+                cassandraMap.put("productUniversalAccessories", productUniversalAccessories);
+            }
+        }
+
+
+    }
+
+}
