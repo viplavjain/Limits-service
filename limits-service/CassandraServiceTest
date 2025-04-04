@@ -1,0 +1,58 @@
+package persistence.service;
+
+import com.vzw.tools.common.exception.ConverterException;
+import com.vzw.tools.common.exception.ErrorBuilder;
+import com.vzw.tools.common.util.JsonToObjectConverter;
+import com.vzw.tools.persistence.configuration.CassandraConfiguration;
+import com.vzw.tools.persistence.service.CassandraService;
+import com.vzw.tools.source.configuration.RunTimeMapInitializer;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Mono;
+
+@ExtendWith(MockitoExtension.class)
+public class CassandraServiceTest {
+
+    private CassandraService cassandraService;
+
+    @Mock
+    private CassandraConfiguration caasandraConfiguration;
+
+    @Mock
+    private RunTimeMapInitializer runTimeMapInitializer;
+
+    @Mock
+    private ErrorBuilder errorBuilder;
+
+    @Mock
+    private Object cassandraResponseObject;
+
+    @BeforeEach
+    void setUp() throws ConverterException {
+        cassandraService = Mockito.spy(new CassandraService(caasandraConfiguration, runTimeMapInitializer, errorBuilder));
+        MockitoAnnotations.openMocks(this);
+         cassandraResponseObject = JsonToObjectConverter.jsonToObject("cassandraResponse.json", Object.class);
+        System.out.println("Cassandra Response Object " + cassandraResponseObject);
+    }
+
+    @Test
+    void getCassandraDeviceUpdatedDetails(){
+       String sorId = "sorId";
+       String productType = "promotion";
+       String env = "qa1";
+       /*when(cassandraService.getDeviceDetails(sorId, productType, env)).
+               thenReturn(Mono.just(cassandraResponseObject));*/
+        Mockito.doReturn(Mono.just(cassandraResponseObject))
+                .when(cassandraService).getDeviceDetails(sorId, productType, env);
+        //doReturn(Mono.just(cassandraResponseObject)).when(cassandraService).getDeviceDetails(sorId, productType, env);
+       Mono<Object> response = cassandraService.getPromotionDetails(sorId, productType, env);
+       Assertions.assertNotNull(response);
+    }
+}
