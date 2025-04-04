@@ -296,3 +296,41 @@ public class CassandraService {
     }
 
 }
+------------------------------------------------------------------------------
+    @Test
+    void testGetPromotionDetails_success() {
+        String sorId = "1234";
+        String productType = "promotion";
+        String env = "dev";
+
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("key", "value");
+
+        // Mock the internal method getDeviceDetails to return a Mono
+        Mockito.doReturn(Mono.just(mockResponse))
+                .when(spyService).getDeviceDetails(sorId, productType, env);
+
+        StepVerifier.create(spyService.getPromotionDetails(sorId, productType, env))
+                .expectNext(mockResponse)
+                .verifyComplete();
+    }
+
+
+    @Test
+    void testGetPromotionDetails_success() {
+        String sorId = "1234";
+        String productType = "promotion";
+        String env = "dev";
+
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("key", "value");
+
+        // Mock the internal method getDeviceDetails to return a Mono
+        Mockito.doReturn(Mono.just(mockResponse))
+                .when(spyService).getDeviceDetails(sorId, productType, env);
+
+        StepVerifier.create(spyService.getPromotionDetails(sorId, productType, env))
+                .expectNext(mockResponse)
+                .verifyComplete();
+    }
+
