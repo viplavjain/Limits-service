@@ -296,6 +296,31 @@ public class CassandraService {
     }
 
 }
+---------------------------------------------------------------------------------------
+@ExtendWith(MockitoExtension.class)
+class CassandraServiceTest {
+
+    @Mock
+    private CassandraConfiguration cassandraConfiguration;
+
+    @Mock
+    private RunTimeMapInitializer runTimeMapInitializer;
+
+    @Mock
+    private ErrorBuilder errorBuilder;
+
+    @InjectMocks
+    private CassandraService cassandraService;
+
+    // We will mock this via a spy to override getDeviceDetails()
+    @Spy
+    private CassandraService spyService;
+
+    @BeforeEach
+    void setup() {
+        spyService = Mockito.spy(new CassandraService(cassandraConfiguration, runTimeMapInitializer, errorBuilder));
+    }
+
 ------------------------------------------------------------------------------
     @Test
     void testGetPromotionDetails_success() {
