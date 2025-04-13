@@ -1,0 +1,167 @@
+package com.vzw.tools.source.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vzw.tools.common.exception.CustomThrowableException;
+import com.vzw.tools.common.exception.DataBaseException;
+import com.vzw.tools.common.exception.ErrorBuilder;
+import com.vzw.tools.source.configuration.RunTimeMapInitializer;
+import com.vzw.tools.source.constant.DeviceConstants;
+import com.vzw.tools.source.dao.AccessoryDMDDAO;
+import com.vzw.tools.source.dao.DeviceDMDFamilyDAO;
+import com.vzw.tools.source.dao.DeviceDPIDAO;
+import com.vzw.tools.source.dto.AccessorySourceDto;
+import com.vzw.tools.source.dto.DeviceSourceDto;
+import com.vzw.tools.source.entity.DeviceSkuInfo;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.modelmapper.ModelMapper;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
+
+import java.math.BigDecimal;
+import java.util.*;
+
+import static com.vzw.tools.cache.constant.ElasticServiceConstants.ACCESSORY;
+import static com.vzw.tools.cache.constant.ElasticServiceConstants.DEVICE;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class DeviceServiceTest {
+
+    private DeviceService deviceService;
+    private DMDService dmdService;
+    private DPIService dpiService;
+    private ModelMapper modelMapper;
+    private RunTimeMapInitializer runTimeMapInitializer;
+    private ErrorBuilder errorBuilder;
+
+    @BeforeEach
+    void setUp() {
+        dmdService = mock(DMDService.class);
+        dpiService = mock(DPIService.class);
+        modelMapper = new ModelMapper();
+        runTimeMapInitializer = mock(RunTimeMapInitializer.class);
+        errorBuilder = mock(ErrorBuilder.class);
+
+        deviceService = new DeviceService();
+        deviceService.dmdService = dmdService;
+        deviceService.dpiService = dpiService;
+        deviceService.modelMapper = modelMapper;
+        deviceService.runTimeMapInitializer = runTimeMapInitializer;
+        deviceService.errorBuilder = errorBuilder;
+    }
+
+    @Test
+    void testGetDeviceSourceSuccess() throws Exception {
+        String sorId = "123";
+        String productType = DEVICE;
+
+        // Mock DMD JSON Node
+        JsonNode mockJsonNode = new ObjectMapper().readTree("{\"field\":\"value\"}");
+        when(dmdService.getDMDDetails(sorId, productType)).thenReturn(Mono.just(mockJsonNode));
+
+        // DPI
+        DeviceDPIDAO dpiDao = new DeviceDPIDAO();
+        dpiDao.setSku("SKU");
+        dpiDao.setOneYearPrice(BigDecimal.ONE);
+        dpiDao.setTwoYearPrice(BigDecimal.TEN);
+        dpiDao.setPrepayPrice(BigDecimal.ZERO);
+        dpiDao.setFullRetailPrice(BigDecimal.valueOf(100));
+        dpiDao.setEdgeFullRetailPrice(BigDecimal.valueOf(200));
+        when(dpiService.getDPIDeviceDetails(any(), any(), any())).thenReturn(Mono.just(dpiDao));
+
+        // DMD Device Family
+        DeviceDMDFamilyDAO famDao = new DeviceDMDFamilyDAO();
+        var save = new DeviceDMDFamilyDAO.ImAccessoryList.Save();
+        save.setAccSku(List.of("A1", "A2"));
+        var accList = new DeviceDMDFamilyDAO.ImAccessoryList();
+        accList.setSave(save);
+        famDao.setImAccessoryList(accList);
+        when(dmdService.getDMDDeviceFamilyDao(sorId)).thenReturn(Mono.just(famDao));
+
+        // Map
+        HashMap<String, String> sourceMap = new HashMap<>();
+        sourceMap.put("SKU", "SKU");
+        when(runTimeMapInitializer.getSourceMap(productType)).thenReturn(sourceMap);
+
+        StepVerifier.create(deviceService.getDeviceSource(sorId, productType))
+                .assertNext(map -> assertTrue(map.containsKey("SKU")))
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetSourceMappedJsonForDevice() throws DataBaseException {
+        String sorId = "456";
+        String productType = DEVICE;
+
+        Map<String, String> mockMap = Map.of("k", "v");
+        DeviceService spyService = spy(deviceService);
+        doReturn(Mono.just(mockMap)).when(spyService).getDeviceSource(sorId, productType);
+
+        StepVerifier.create(spyService.getSourceMappedJson(sorId, productType))
+                .expectNext(mockMap)
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetSourceMappedJsonForAccessory() throws DataBaseException {
+        String sorId = "789";
+        String productType = ACCESSORY;
+
+        AccessorySourceDto dto = new AccessorySourceDto();
+        HashMap<String, String> dummyMap = new HashMap<>();
+        dummyMap.put("k", "v");
+
+        DeviceService spyService = spy(deviceService);
+        doReturn(Mono.just(dto)).when(spyService).getAccessorySourceDto(sorId, productType);
+        doReturn(dummyMap).when(spyService).getSourceMappedJson(dto, productType);
+
+        StepVerifier.create(spyService.getSourceMappedJson(sorId, productType))
+                .expectNext(dummyMap)
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetSourceMappedJsonFromDto() {
+        AccessorySourceDto dto = new AccessorySourceDto();
+        Map<String, String> dtoProps = Map.of("sku", "skuValue");
+        Map<String, String> sourceMap = Map.of("SKU", "sku");
+
+        DeviceService spyService = spy(deviceService);
+        doReturn((HashMap<String, String>) dtoProps).when(spyService).getSourceMappedJson(dto, ACCESSORY);
+        when(runTimeMapInitializer.getSourceMap(ACCESSORY)).thenReturn((HashMap<String, String>) sourceMap);
+
+        HashMap<String, String> result = spyService.getSourceMappedJson(dto, ACCESSORY);
+        assertEquals("skuValue", result.get("SKU"));
+    }
+
+    @Test
+    void testFetchAndPopulateDMDDetailsDevice() throws Exception {
+        String sorId = "987";
+        String productType = DEVICE;
+        DeviceDMDDAO dao = new DeviceDMDDAO();
+        dao.setDeviceSkuList(new DeviceDMDDAO.DeviceSkuList());
+        dao.getDeviceSkuList().setDeviceSkuInfo(List.of(new DeviceSkuInfo("987", "info")));
+        dao.setUniversalPropCdList(new DeviceDMDDAO.UniversalPropCdList());
+        dao.setMarketingCompatibleSimSkuList(new DeviceDMDDAO.MarketingCompatibleSimSkuList());
+
+        when(dmdService.getDMDDao(sorId, productType)).thenReturn(Mono.just(dao));
+
+        StepVerifier.create(deviceService.getSourceMappedJson(sorId, productType))
+                .verifyComplete(); // fallback for internal call only
+    }
+
+    @Test
+    void testErrorHandlingWithInvalidJson() throws Exception {
+        String sorId = "999";
+        String productType = DEVICE;
+        JsonNode invalidNode = new ObjectMapper().readTree("\"unparseable\"");
+
+        when(dmdService.getDMDDetails(sorId, productType)).thenReturn(Mono.just(invalidNode));
+
+        StepVerifier.create(deviceService.getDeviceSource(sorId, productType))
+                .expectError(CustomThrowableException.class)
+                .verify();
+    }
+}
