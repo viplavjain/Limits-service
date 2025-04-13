@@ -1,0 +1,142 @@
+package com.vzw.tools.source.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.vzw.tools.common.exception.DataBaseException;
+import com.vzw.tools.common.exception.ErrorBuilder;
+import com.vzw.tools.helpers.jdbc.DMDAccessoryJdbcReactiveHelper;
+import com.vzw.tools.helpers.jdbc.DMDDeviceFamilyJdbcReactiveHelper;
+import com.vzw.tools.helpers.jdbc.DMDJdbcReactiveHelper;
+import com.vzw.tools.source.dao.AccessoryDMDDAO;
+import com.vzw.tools.source.dao.DeviceDMDDAO;
+import com.vzw.tools.source.dao.DeviceDMDFamilyDAO;
+import com.vzw.tools.common.exception.ErrorMessages;
+import com.vzw.tools.common.exception.XmlConversionException;
+import com.vzw.tools.source.repository.DMDRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
+import java.util.Map;
+
+import static com.vzw.tools.common.constant.CommonConstants.*;
+
+
+@Component
+@Slf4j
+public class DMDService {
+
+    @Qualifier("dmdJdbcTemplate")
+    private final JdbcTemplate dmdJdbcTemplate;
+
+    private final DMDRepository dmdRepository;
+
+    @Autowired
+    private DMDJdbcReactiveHelper dmdJdbcReactiveHelper;
+
+    private final DMDAccessoryJdbcReactiveHelper dmdAccessoryJdbcReactiveHelper;
+
+    @Autowired
+    private DMDDeviceFamilyJdbcReactiveHelper dmdDeviceFamilyJdbcReactiveHelper;
+
+    private ErrorBuilder errorBuilder;
+
+    public DMDService(JdbcTemplate dmdJdbcTemplate, DMDRepository dmdRepository, DMDAccessoryJdbcReactiveHelper dmdAccessoryJdbcReactiveHelper, ErrorBuilder errorBuilder) {
+        this.dmdJdbcTemplate = dmdJdbcTemplate;
+        this.dmdRepository = dmdRepository;
+        this.dmdAccessoryJdbcReactiveHelper = dmdAccessoryJdbcReactiveHelper;
+        this.errorBuilder = errorBuilder;
+    }
+
+    public Mono<Object> getDMDDao(String sorId, String productType) throws  DataBaseException {
+        log.info("getDMDDao() begins for sorId:{}",sorId);
+        return getDMDXML(sorId, productType).flatMap(xmlData -> {
+            XmlMapper xmlMapper = new XmlMapper();
+            Object dmdDao = null;
+            try {
+                switch (productType) {
+                    case PROD_TYPE_DEVICE:
+                        dmdDao = xmlMapper.readValue(xmlData, DeviceDMDDAO.class);
+                        break;
+                    case PROD_TYPE_ACCESSORY:
+                        dmdDao = xmlMapper.readValue(xmlData, AccessoryDMDDAO.class);
+                        break;
+                }
+                log.info("getDMDDao() ends for sorId:{}",sorId);
+                return Mono.just(dmdDao);
+            }
+            catch (JsonProcessingException e) {
+                return Mono.error(new RuntimeException(e.getMessage()));
+            }
+
+        });
+    }
+
+    public Mono<JsonNode> getDMDDetails(String sorId, String productType) throws DataBaseException {
+        log.info("getDMDDetails() begins for sorId:{}",sorId);
+        return getDMDXML(sorId, productType).flatMap(xmlData -> {
+            JsonNode jsonNode;
+            try {
+                XmlMapper objectMapper = new XmlMapper();
+                jsonNode = objectMapper.readTree(xmlData);
+            } catch (Exception e) {
+                return Mono.error(errorBuilder.buildApplicationException(e));
+            }
+            log.info("getDMDDetails() ends for sorId:{}",sorId);
+            return Mono.just(jsonNode);
+        });
+
+    }
+
+    public Mono<String> getDMDXML(String sorId, String productType) throws DataBaseException {
+        switch (productType) {
+            case PROD_TYPE_DEVICE:
+                return getDMDDevice(sorId);
+            case PROD_TYPE_ACCESSORY:
+                return getDMDAccessory(sorId);
+        }
+        return Mono.empty();
+    }
+
+    public Mono<String> getDMDDevice(String sorId) throws DataBaseException {
+        log.info("getDMDDevice() begins for sorId:{}",sorId);
+        return dmdJdbcReactiveHelper.retrieveDMDResponse(sorId);
+    }
+
+    public Mono<String> getDMDAccessory(String sorId) throws DataBaseException {
+        log.info("getDMDAccessory() begins for sorId:{}",sorId);
+        return dmdAccessoryJdbcReactiveHelper.retrieveDMDAccessoryResponse(sorId);
+    }
+
+    public String getDMDDeviceFamilyXML(String sorId) throws DataBaseException {
+        log.info("getDMDDeviceFamilyXML() begins for sorId:{}",sorId);
+        String result=null;
+        Map<String, Object> deviceDMDFamily = dmdRepository.fetchDeviceFamilyDMD(sorId);
+        if(deviceDMDFamily !=null){
+            //Fetch the XML from DMD response removing the leading and trailing braces
+            result=deviceDMDFamily.toString().replace(DEV_FAMILY_RESULT_SET, EMPTY_STRING)
+                    .replace(BRACE, EMPTY_STRING);
+        }
+        log.info("getDMDDeviceFamilyXML() ends for sorId:{}, result:{}",sorId,result);
+        return result;
+    }
+
+    public Mono<DeviceDMDFamilyDAO> getDMDDeviceFamilyDao(String sorId){
+        XmlMapper objectMapper = new XmlMapper();
+        return dmdDeviceFamilyJdbcReactiveHelper.retrieveDMDDeviceFamilyResponse(sorId).flatMap(xmlData -> {
+            DeviceDMDFamilyDAO deviceDMDFamilyDAO = new DeviceDMDFamilyDAO();
+            try {
+                deviceDMDFamilyDAO = objectMapper.readValue(xmlData, DeviceDMDFamilyDAO.class);
+            } catch (Exception e) {
+                return Mono.just(deviceDMDFamilyDAO);
+            }
+            return Mono.just(deviceDMDFamilyDAO);
+        });
+
+    }
+
+}
