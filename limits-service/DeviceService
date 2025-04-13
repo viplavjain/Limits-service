@@ -1,0 +1,181 @@
+package com.vzw.tools.source.service;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vzw.tools.common.exception.CustomThrowableException;
+import com.vzw.tools.common.exception.DataBaseException;
+import com.vzw.tools.common.exception.ErrorBuilder;
+import com.vzw.tools.common.util.CommonUtil;
+import com.vzw.tools.source.configuration.RunTimeMapInitializer;
+import com.vzw.tools.source.constant.DeviceConstants;
+import com.vzw.tools.source.dao.AccessoryDMDDAO;
+import com.vzw.tools.source.dao.DeviceDMDDAO;
+import com.vzw.tools.source.dao.DeviceDMDFamilyDAO;
+import com.vzw.tools.source.dao.DeviceDPIDAO;
+import com.vzw.tools.source.dto.AccessorySourceDto;
+import com.vzw.tools.source.dto.DeviceSourceDto;
+import com.vzw.tools.source.entity.DeviceSkuInfo;
+import com.vzw.tools.common.exception.XmlConversionException;
+import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
+import org.modelmapper.convention.MatchingStrategies;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static com.vzw.tools.cache.constant.ElasticServiceConstants.ACCESSORY;
+import static com.vzw.tools.cache.constant.ElasticServiceConstants.DEVICE;
+import static com.vzw.tools.common.constant.CommonConstants.EMPTY_STRING;
+
+@Service
+@Slf4j
+public class DeviceService {
+    @Autowired
+    private DMDService dmdService;
+
+    @Autowired
+    private DPIService dpiService;
+
+    @Autowired
+    private ModelMapper modelMapper;
+
+    @Autowired
+    RunTimeMapInitializer runTimeMapInitializer;
+
+    @Autowired
+    ErrorBuilder errorBuilder;
+
+    public Mono<Map<String, String>> getDeviceSource(String sorId, String productType) throws DataBaseException {
+        Mono<JsonNode> dmdDeviceSource = dmdService.getDMDDetails(sorId, productType);
+        Mono<DeviceDPIDAO> deviceDPIDAOMono = dpiService.getDPIDeviceDetails(sorId, productType, EMPTY_STRING);
+        Mono<DeviceDMDFamilyDAO> deviceDMDFamilyDAOMono = dmdService.getDMDDeviceFamilyDao(sorId);
+        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
+        ObjectMapper objectMapper = new ObjectMapper();
+        return dmdDeviceSource.flatMap(jsonNode -> {
+            try {
+                Map<String, Object> dmdDeviceResponse = objectMapper.readValue(jsonNode.traverse(), new TypeReference<Map<String, Object>>() {
+                });
+
+                Map<String, String> dmdMap = new HashMap<String, String>();
+                Mono<Map<String, String>> dmdFinalMap = CommonUtil.convertDMDJsonMapToMap(dmdDeviceResponse, dmdMap, "", sorId);
+
+                return Mono.zip(dmdFinalMap, deviceDPIDAOMono, deviceDMDFamilyDAOMono).flatMap(sources -> {
+                    sources.getT1().put(DeviceConstants.SKU, sources.getT2().getSku());
+                    sources.getT1().put(DeviceConstants.ONE_YEAR_PRICE, String.valueOf(sources.getT2().getOneYearPrice()));
+                    sources.getT1().put(DeviceConstants.TWO_YEAR_PRICE, String.valueOf(sources.getT2().getTwoYearPrice()));
+                    sources.getT1().put(DeviceConstants.PREPAY_PRICE, String.valueOf(sources.getT2().getPrepayPrice()));
+                    sources.getT1().put(DeviceConstants.FULL_RETAIL_PRICE, String.valueOf(sources.getT2().getFullRetailPrice()));
+                    sources.getT1().put(DeviceConstants.EDGE_FULL_RETAIL_PRICE, String.valueOf(sources.getT2().getEdgeFullRetailPrice()));
+                    sources.getT1().put(DeviceConstants.IM_ACCESSORY_LIST, sources.getT3().getImAccessoryList().getSave().getAccSku().toString());
+
+                    Map<String, String> sourceMap = getSourceMappedJson(sources.getT1(), productType);
+                    return Mono.just(sourceMap);
+                });
+            } catch (IOException e) {
+                throw new CustomThrowableException("Failed to read the Source JSON node", e);
+            }
+        }).onErrorMap(errorBuilder::buildApplicationException);
+    }
+
+    private HashMap<String, String> getSourceMappedJson(Map<String, String> sourceMap,String productType) {
+        HashMap<String, String> sourceMapJson = new HashMap<>();
+        try {
+            HashMap<String, String> sourceConfigMap = runTimeMapInitializer.getSourceMap(productType);
+            for (Map.Entry<String, String> e : sourceConfigMap.entrySet()) {
+                String value = sourceMap.get(e.getValue());
+                sourceMapJson.put(e.getKey(), value);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return sourceMapJson;
+    }
+
+    private Mono<DeviceSourceDto> fetchAndPopulateDMDDetails(String sorId, String productType) {
+        try {
+            return dmdService.getDMDDao(sorId, productType).flatMap(deviceDMDResp-> {
+                DeviceDMDDAO deviceDMDDAO = ((DeviceDMDDAO)deviceDMDResp);
+                DeviceSourceDto deviceSourceDto = new DeviceSourceDto();
+                log.info("fetchAndPopulateDMDDetails() call begins for sorId:{},productType:{}", sorId, productType);
+                if (deviceDMDDAO != null) {
+                    modelMapper.map(deviceDMDDAO, deviceSourceDto);
+                    for (DeviceSkuInfo deviceSkuInfo : deviceDMDDAO.getDeviceSkuList().getDeviceSkuInfo()) {
+                        if (deviceSkuInfo.getDeviceSku().equals(sorId)) {
+                            modelMapper.map(deviceSkuInfo, deviceSourceDto);
+                            break;
+                        }
+                    }
+                    deviceSourceDto.setUniversalPropCdList(deviceDMDDAO.getUniversalPropCdList().getUniversalPropCd());
+                    deviceSourceDto.setMarketingCompatibleSimSkuList(deviceDMDDAO.getMarketingCompatibleSimSkuList().getSimSku());
+                } else {
+                    log.info("dmdService.getDMDDao() returns null value for sorId:{},productType:{}", sorId, productType);
+                }
+                log.info("fetchAndPopulateDMDDetails() call ends for sorId:{},productType:{}", sorId, productType);
+                return Mono.just(deviceSourceDto);
+            });
+        } catch (DataBaseException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Mono<Map<String, String>> getSourceMappedJson(String sorId, String productType) throws DataBaseException {
+        if(productType.equalsIgnoreCase(DEVICE)){
+            return getDeviceSource(sorId, productType).flatMap(Mono::just);
+        } else if (productType.equalsIgnoreCase(ACCESSORY)) {
+            return getAccessorySourceDto(sorId, productType)
+                    .flatMap(accessorySourceDto -> Mono.just(getSourceMappedJson(accessorySourceDto,productType)));
+        }
+        return null;
+    }
+
+    private Mono<AccessorySourceDto> getAccessorySourceDto(String sorId, String productType) {
+        Mono<AccessoryDMDDAO> accessoryDMDDAOMono = fetchAndPopulateDMDDetailsForACC(sorId,productType);
+        Mono<DeviceDPIDAO> accessoryDPIDAOMono=dpiService.getDPIDeviceDetails(sorId,productType,EMPTY_STRING);
+        AccessorySourceDto accessorySourceDto=new AccessorySourceDto();
+        return Mono.zip(accessoryDMDDAOMono,accessoryDPIDAOMono).flatMap(source->{
+            modelMapper.map(source.getT1(), accessorySourceDto);
+            modelMapper.map(source.getT2(), accessorySourceDto);
+            return Mono.just(accessorySourceDto);
+        });
+    }
+
+    private Mono<AccessoryDMDDAO> fetchAndPopulateDMDDetailsForACC(String sorId, String productType)  {
+        try {
+            return dmdService.getDMDDao(sorId, productType).flatMap(accessoryDMDResp-> {
+                AccessoryDMDDAO accessoryDMDDAO=new AccessoryDMDDAO();
+                log.info("fetchAndPopulateDMDDetailsForACC() call begins for sorId:{},productType:{}", sorId, productType);
+                if (accessoryDMDResp != null) {
+                    modelMapper.map(accessoryDMDResp, accessoryDMDDAO);
+                } else {
+                    log.info("dmdService.getDMDDao() returns null value for sorId:{},productType:{}", sorId, productType);
+                }
+                log.info("fetchAndPopulateDMDDetailsForACC() call ends for sorId:{},productType:{}", sorId, productType);
+                return Mono.just(accessoryDMDDAO);
+
+            });
+
+        } catch (DataBaseException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    private HashMap<String, String> getSourceMappedJson(Object dto,String productType) {
+        HashMap<String, String> sourceMapJson = new HashMap<>();
+        try {
+            HashMap<String, String> dtoSourcePropertyMap = CommonUtil.getPropertiesMap(dto);
+            HashMap<String, String> sourceMap = runTimeMapInitializer.getSourceMap(productType);
+            for (Map.Entry<String, String> e : sourceMap.entrySet()) {
+                String value = dtoSourcePropertyMap.get(e.getValue());
+                sourceMapJson.put(e.getKey(), value);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return sourceMapJson;
+    }
+
+}
