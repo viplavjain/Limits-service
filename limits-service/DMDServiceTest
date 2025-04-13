@@ -1,0 +1,174 @@
+package com.vzw.tools.source.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.vzw.tools.common.exception.DataBaseException;
+import com.vzw.tools.common.exception.ErrorBuilder;
+import com.vzw.tools.common.exception.XmlConversionException;
+import com.vzw.tools.helpers.jdbc.DMDAccessoryJdbcReactiveHelper;
+import com.vzw.tools.helpers.jdbc.DMDDeviceFamilyJdbcReactiveHelper;
+import com.vzw.tools.helpers.jdbc.DMDJdbcReactiveHelper;
+import com.vzw.tools.source.dao.AccessoryDMDDAO;
+import com.vzw.tools.source.dao.DeviceDMDDAO;
+import com.vzw.tools.source.dao.DeviceDMDFamilyDAO;
+import com.vzw.tools.source.repository.DMDRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.*;
+import org.springframework.jdbc.core.JdbcTemplate;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.mockito.Mockito.*;
+
+class DMDServiceTest {
+
+    @Mock
+    private JdbcTemplate jdbcTemplate;
+
+    @Mock
+    private DMDRepository dmdRepository;
+
+    @Mock
+    private DMDJdbcReactiveHelper dmdJdbcReactiveHelper;
+
+    @Mock
+    private DMDAccessoryJdbcReactiveHelper dmdAccessoryJdbcReactiveHelper;
+
+    @Mock
+    private DMDDeviceFamilyJdbcReactiveHelper dmdDeviceFamilyJdbcReactiveHelper;
+
+    @Mock
+    private ErrorBuilder errorBuilder;
+
+    @InjectMocks
+    private DMDService dmdService;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+        dmdService = new DMDService(jdbcTemplate, dmdRepository, dmdAccessoryJdbcReactiveHelper, errorBuilder);
+        dmdService.dmdJdbcReactiveHelper = dmdJdbcReactiveHelper;
+        dmdService.dmdDeviceFamilyJdbcReactiveHelper = dmdDeviceFamilyJdbcReactiveHelper;
+    }
+
+    @Test
+    void testGetDMDDevice() {
+        when(dmdJdbcReactiveHelper.retrieveDMDResponse("123")).thenReturn(Mono.just("<xml>Device</xml>"));
+        StepVerifier.create(dmdService.getDMDDevice("123"))
+                .expectNext("<xml>Device</xml>")
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetDMDAccessory() {
+        when(dmdAccessoryJdbcReactiveHelper.retrieveDMDAccessoryResponse("123")).thenReturn(Mono.just("<xml>Accessory</xml>"));
+        StepVerifier.create(dmdService.getDMDAccessory("123"))
+                .expectNext("<xml>Accessory</xml>")
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetDMDXMLForDevice() {
+        when(dmdJdbcReactiveHelper.retrieveDMDResponse("123")).thenReturn(Mono.just("<xml>Device</xml>"));
+        StepVerifier.create(dmdService.getDMDXML("123", "device"))
+                .expectNext("<xml>Device</xml>")
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetDMDXMLForAccessory() {
+        when(dmdAccessoryJdbcReactiveHelper.retrieveDMDAccessoryResponse("123")).thenReturn(Mono.just("<xml>Accessory</xml>"));
+        StepVerifier.create(dmdService.getDMDXML("123", "accessory"))
+                .expectNext("<xml>Accessory</xml>")
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetDMDXMLForUnknownType() {
+        StepVerifier.create(dmdService.getDMDXML("123", "other"))
+                .verifyComplete(); // returns Mono.empty()
+    }
+
+    @Test
+    void testGetDMDDetailsSuccess() {
+        when(dmdJdbcReactiveHelper.retrieveDMDResponse("123")).thenReturn(Mono.just("<xml><a>1</a></xml>"));
+        StepVerifier.create(dmdService.getDMDDetails("123", "device"))
+                .expectNextMatches(node -> node.has("a"))
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetDMDDetailsXmlParseException() {
+        when(dmdJdbcReactiveHelper.retrieveDMDResponse("123")).thenReturn(Mono.just("bad xml"));
+        RuntimeException ex = new RuntimeException("bad");
+        when(errorBuilder.buildApplicationException(any())).thenReturn(ex);
+
+        StepVerifier.create(dmdService.getDMDDetails("123", "device"))
+                .expectErrorMatches(e -> e == ex)
+                .verify();
+    }
+
+    @Test
+    void testGetDMDDaoForDevice() {
+        when(dmdJdbcReactiveHelper.retrieveDMDResponse("123")).thenReturn(Mono.just("<DeviceDMDDAO/>"));
+        StepVerifier.create(dmdService.getDMDDao("123", "device"))
+                .expectNextMatches(obj -> obj instanceof DeviceDMDDAO)
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetDMDDaoForAccessory() {
+        when(dmdAccessoryJdbcReactiveHelper.retrieveDMDAccessoryResponse("123")).thenReturn(Mono.just("<AccessoryDMDDAO/>"));
+        StepVerifier.create(dmdService.getDMDDao("123", "accessory"))
+                .expectNextMatches(obj -> obj instanceof AccessoryDMDDAO)
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetDMDDaoWithBadXML() {
+        when(dmdJdbcReactiveHelper.retrieveDMDResponse("123")).thenReturn(Mono.just("bad xml"));
+        StepVerifier.create(dmdService.getDMDDao("123", "device"))
+                .expectError(RuntimeException.class)
+                .verify();
+    }
+
+    @Test
+    void testGetDMDDeviceFamilyXML() {
+        Map<String, Object> map = new HashMap<>();
+        map.put("XML", "<xml>data</xml>");
+        when(dmdRepository.fetchDeviceFamilyDMD("123")).thenReturn(map);
+        String result = dmdService.getDMDDeviceFamilyXML("123");
+        assert !result.contains("{") && !result.contains("}");
+    }
+
+    @Test
+    void testGetDMDDeviceFamilyXML_NullCase() {
+        when(dmdRepository.fetchDeviceFamilyDMD("123")).thenReturn(null);
+        String result = dmdService.getDMDDeviceFamilyXML("123");
+        assert result == null;
+    }
+
+    @Test
+    void testGetDMDDeviceFamilyDaoSuccess() {
+        when(dmdDeviceFamilyJdbcReactiveHelper.retrieveDMDDeviceFamilyResponse("123"))
+                .thenReturn(Mono.just("<DeviceDMDFamilyDAO/>"));
+
+        StepVerifier.create(dmdService.getDMDDeviceFamilyDao("123"))
+                .expectNextMatches(obj -> obj instanceof DeviceDMDFamilyDAO)
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetDMDDeviceFamilyDaoException() {
+        when(dmdDeviceFamilyJdbcReactiveHelper.retrieveDMDDeviceFamilyResponse("123"))
+                .thenReturn(Mono.just("bad xml"));
+
+        StepVerifier.create(dmdService.getDMDDeviceFamilyDao("123"))
+                .expectNextMatches(obj -> obj instanceof DeviceDMDFamilyDAO)
+                .verifyComplete(); // fallback on empty DAO
+    }
+}
