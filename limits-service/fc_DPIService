@@ -1,0 +1,65 @@
+package com.vzw.tools.source.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vzw.tools.common.exception.DataBaseException;
+import com.vzw.tools.common.exception.DataNotFoundException;
+import com.vzw.tools.common.util.JsonUtil;
+import com.vzw.tools.helpers.jdbc.DeviceDpiJdbcReactiveHelper;
+import com.vzw.tools.source.dao.DeviceDPIDAO;
+import com.vzw.tools.common.exception.ErrorMessages;
+import com.vzw.tools.common.exception.XmlConversionException;
+import com.vzw.tools.source.repository.DPIRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+
+import static com.vzw.tools.common.constant.CommonConstants.*;
+
+@Component
+@Slf4j
+public class DPIService {
+
+    @Qualifier("dpiJdbcTemplate")
+    private final JdbcTemplate dpiJdbcTemplate;
+
+    private final DPIRepository dpiRepository;
+
+    @Autowired
+    DeviceDpiJdbcReactiveHelper deviceDpiJdbcReactiveHelper;
+
+    public DPIService(JdbcTemplate dpiJdbcTemplate, DPIRepository dpiRepository) {
+        this.dpiJdbcTemplate = dpiJdbcTemplate;
+        this.dpiRepository = dpiRepository;
+    }
+
+    public Map<String, Object> getDeviceDPI(String sorId) throws DataBaseException {
+        return dpiRepository.fetchDeviceDPI(sorId);
+    }
+
+    public Mono<DeviceDPIDAO> getDPIDeviceDetails(String sorId, String productType, String env) {
+        log.info("getDPIDeviceDetails() calls begins for sorId: {}", sorId);
+        return  deviceDpiJdbcReactiveHelper.retrieveDPIResponse(sorId);
+    }
+
+    public DeviceDPIDAO mapDeviceDPIResult(Map<String, Object> deviceDPIDataMap) {
+        DeviceDPIDAO deviceDPIDAO = new DeviceDPIDAO();
+        deviceDPIDAO.setSku((String) deviceDPIDataMap.get(SKU));
+        deviceDPIDAO.setSkuType((String) deviceDPIDataMap.get(SKU_TYPE));
+        deviceDPIDAO.setLocationCode((String) deviceDPIDataMap.get(LOCATION_CODE));
+        deviceDPIDAO.setFullRetailPrice((BigDecimal) deviceDPIDataMap.get(FULL_RETAIL_PRICE));
+        deviceDPIDAO.setOneYearPrice((BigDecimal) deviceDPIDataMap.get(ONE_YEAR_PRICE));
+        deviceDPIDAO.setTwoYearPrice((BigDecimal) deviceDPIDataMap.get(TWO_YEAR_PRICE));
+        deviceDPIDAO.setPrepayPrice((BigDecimal) deviceDPIDataMap.get(PREPAY_PRICE));
+        deviceDPIDAO.setEdgeSku((String) deviceDPIDataMap.get(EDGE_SKU));
+        deviceDPIDAO.setEdgeFullRetailPrice((BigDecimal) deviceDPIDataMap.get(EDGE_FULL_RETAIL_PRICE));
+        return deviceDPIDAO;
+    }
+}
