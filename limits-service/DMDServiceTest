@@ -79,6 +79,29 @@ class DMDServiceTest {
                 .verifyComplete();
     }
 
+   @Test
+    void testGetDMDDetails_xmlParsingFails_throwsException() {
+        // Malformed XML to force XmlMapper.readTree() to throw
+        String invalidXml = "<Device><sku>123456"; // Missing closing tag
+
+        // Custom application exception returned by errorBuilder
+        RuntimeException expectedException = new RuntimeException("Parsing error");
+
+        // Mock getDMDXML to return malformed XML
+        Mockito.doReturn(Mono.just(invalidXml))
+                .when(dmdService).getDMDXML(sorId, productType);
+
+        // Mock errorBuilder to return custom exception
+        Mockito.when(errorBuilder.buildApplicationException(Mockito.any()))
+                .thenReturn(expectedException);
+
+        // Verify the Mono emits the expected exception
+        StepVerifier.create(dmdService.getDMDDetails(sorId, productType))
+                .expectErrorMatches(throwable -> throwable.getMessage().equals("Parsing error"))
+                .verify();
+    }
+}
+
     @Test
     void testGetDMDXMLForAccessory() {
         when(dmdAccessoryJdbcReactiveHelper.retrieveDMDAccessoryResponse("123")).thenReturn(Mono.just("<xml>Accessory</xml>"));
